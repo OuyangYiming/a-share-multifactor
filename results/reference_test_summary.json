@@ -1,0 +1,9 @@
+{
+  "tests": 33,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "seconds": 0.912,
+  "command": "python -m pytest tests/test_reference_data.py -q --junitxml=results/reference_test_results.xml",
+  "scope": "Reference module unit tests with constructed fixtures; no live calls and no external price certification"
+}

@@ -1,0 +1,370 @@
+{
+  "audit_date": "2026-11-09",
+  "akshare_version": "1.20.36",
+  "scope": "Read-only bounded public source audit; no main project code or Git operations.",
+  "conclusion": "Free sources support continued engineering and partial historical metadata. No verified free combination presently establishes a complete, point-in-time whole-A universe with delisted histories, ST/halt states and consistent industry history. Do not mark full stage 1 accepted or missing booleans false.",
+  "preferred_next_actions": [
+    "Integrate exchange delisting lists as raw metadata candidates with source hashes and explicit A/B filtering, separately from proof of whole-universe completeness.",
+    "Try valuation ingestion on remaining pilot symbols with missingness, raw-count and end-date validation. Keep the 2015-2017 gap explicit; a 2018-start study is a separate disclosed scope choice, not silent backfilling.",
+    "Build Shenzhen dated-name ST interval prototype and coverage checks without claiming coverage of Shanghai or Beijing.",
+    "Keep rejected suspension snapshot and unverified industry histories out of eligible-for-backtest flags until their coverage is established.",
+    "If an existing authorized provider/export is available later, use the documented historical endpoints to close gaps; no paid purchase or token sharing is required for the current engineering steps."
+  ],
+  "sources": [
+    {
+      "field": "daily_market_cap_pe_pb",
+      "endpoint": "stock_value_em",
+      "probe": "value",
+      "status": "real_sample_available_not_PIT_certified",
+      "source_url": "https://data.eastmoney.com/gzfx/detail/600000.html",
+      "code_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/valuation/stock_value_em.py",
+      "finding": "600000: 2146 daily rows, 2018-01-02..2026-11-09. Raw API count is also 2146, so this sample is not truncated at SDK pageSize 5000.",
+      "limitation": "No 2015-2017 coverage in this sample. Only one stock probed. Financial disclosure timing and historical restatements are not documented by the observed response. The SDK fetches only page 1; validate total count for each security. Filter observations after task end date.",
+      "observed_rows": 2146,
+      "observation_file": "value.json"
+    },
+    {
+      "field": "sz_historical_ST_name_events",
+      "endpoint": "stock_info_sz_change_name",
+      "probe": "sz_name_changes",
+      "status": "dated_official_events_available_partial_universe",
+      "source_url": "https://www.szse.cn/www/market/stock/changename/index.html",
+      "code_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/issue/stock_info.py",
+      "finding": "7502 dated old/new abbreviation events, 1994-01-03..2026-11-06. 2284 rows contain ST in before or after names. 208 of 212 delisted securities have at least one name event.",
+      "limitation": "Shenzhen only; includes B shares and ordinary name changes. An ST interval prototype requires event ordering, exchange-specific A-share filtering, effective-date checks, and coverage evidence. No events does not prove never ST. Does not close Shanghai/Beijing gap. Current security abbreviation column must not be backfilled historically.",
+      "observed_rows": 7502,
+      "observation_file": "sz_name_changes.json"
+    },
+    {
+      "field": "sh_delisted_universe",
+      "endpoint": "stock_info_sh_delist",
+      "probe": "sh_delist",
+      "status": "official_delist_list_available",
+      "source_url": "https://www.sse.com.cn/assortment/stock/list/delisting/",
+      "code_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/issue/stock_info.py",
+      "finding": "161 returned rows with listing date and upstream DELIST_DATE. SDK labels DELIST_DATE as 暂停上市日期 despite requesting COMPANY_STATUS=3 from the delisting source.",
+      "limitation": "symbol=全部 includes A/B/STAR type selection; filter A shares explicitly. Inspect raw upstream semantics before normalizing delist_date. A single current delisted list plus current live list does not by itself prove complete listing episodes, code changes or relistings. SDK hardcodes pageSize 500/page 1.",
+      "observed_rows": 161,
+      "observation_file": "sh_delist.json"
+    },
+    {
+      "field": "sz_delisted_universe",
+      "endpoint": "stock_info_sz_delist",
+      "probe": "sz_delist",
+      "status": "official_delist_list_available",
+      "source_url": "https://www.szse.cn/market/stock/suspend/index.html",
+      "code_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/issue/stock_info.py",
+      "finding": "212 terminated-listing securities, listing dates 1990-12-01..2022-07-08 and termination dates 1999-07-12..2026-10-28.",
+      "limitation": "Contains B shares. Must distinguish listing episodes and include delisted price/adjustment coverage before claiming no survivorship bias. Include only universe intervals relevant to task dates.",
+      "observed_rows": 212,
+      "observation_file": "sz_delist.json"
+    },
+    {
+      "field": "historical_suspension",
+      "endpoint": "stock_tfp_em",
+      "probe": "suspension",
+      "status": "historical_daily_snapshot_rejected",
+      "source_url": "https://data.eastmoney.com/tfpxx/",
+      "code_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/issue/stock_tfp_em.py",
+      "finding": "date=20151221 returned 3738 records, 3723 with stop starts after 2015-12-21, including 2026-11-10. Raw API reproduces same count and future events.",
+      "limitation": "The supplied date is not a reliable exact-day snapshot filter. Do not label every returned security suspended on requested date or infer non-suspension from absence. Actual end time and predicted resume date are distinct; future-known end data must not be used as an ex ante signal.",
+      "observed_rows": 3738,
+      "observation_file": "suspension.json"
+    },
+    {
+      "field": "historical_industry_cninfo",
+      "endpoint": "stock_industry_change_cninfo",
+      "probe": "industry_cninfo",
+      "status": "dated_classifications_available_baseline_missing",
+      "source_url": "https://webapi.cninfo.com.cn/#/apiDoc",
+      "code_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/finance/stock_industry_cninfo.py",
+      "finding": "600000, requested 2010-01-01..2025-12-31: five records, each a different classification standard, 2019-05-08..2024-02-08. Shenwan record starts 2021-07-30.",
+      "limitation": "These five records are not one continuous industry timeline. No record establishes a 2015/2018 baseline in any chosen standard. SDK drops latest-record marker. Do not retroactively fill older dates or mix classifications. Further source completeness and revision checks required.",
+      "observed_rows": 5,
+      "observation_file": "industry_cninfo.json"
+    },
+    {
+      "field": "historical_industry_sw",
+      "endpoint": "stock_industry_clf_hist_sw",
+      "probe": "industry_sw",
+      "status": "TLS_validation_failed",
+      "source_url": "https://www.swsresearch.com/swindex/pdf/SwClass2021/StockClassifyUse_stock.xls",
+      "code_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/research/stock_industry_sw.py",
+      "finding": "Installed SDK advertises security code, inclusion date, industry code and update time from an official Excel. Real read failed CERTIFICATE_VERIFY_FAILED; verification was not bypassed.",
+      "limitation": "Contents, coverage, in/out history and point-in-time meaning not verified. Latest classification under a 2021 taxonomy cannot automatically be treated as the classification known in 2015.",
+      "observed_rows": null,
+      "observation_file": "industry_sw.json"
+    },
+    {
+      "field": "historical_ST_current_snapshot_rejection",
+      "endpoint": "stock_zh_a_st_em / stock_info_change_name",
+      "probe": "",
+      "status": "source_review_only_not_historical",
+      "source_url": "https://quote.eastmoney.com/center/gridlist.html#riskwarning",
+      "code_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_zh_a_special.py",
+      "finding": "stock_zh_a_st_em is a current risk-warning quote list. Sina stock_info_change_name provides historical names without effective dates.",
+      "limitation": "Neither can alone reconstruct past daily ST labels. A current label must not be broadcast back through the historical panel.",
+      "observed_rows": null,
+      "observation_file": ""
+    }
+  ],
+  "permission_documentation_only": [
+    {
+      "provider": "Tushare",
+      "endpoint": "stock_basic",
+      "minimum_points": 2000,
+      "url": "https://tushare.pro/document/2?doc_id=25",
+      "use": "Request at least L/D/P status separately, include list_date/delist_date; industry here is not historical.",
+      "limits": "6000 rows/request; 50 requests/minute per current page."
+    },
+    {
+      "provider": "Tushare",
+      "endpoint": "stock_st",
+      "minimum_points": 3000,
+      "url": "https://tushare.pro/document/2?doc_id=397",
+      "use": "Historical daily ST list from 2000-01-01; trade_date/start_date/end_date supported.",
+      "limits": "1000 rows/request; page/date partitioning and completeness validation needed."
+    },
+    {
+      "provider": "Tushare",
+      "endpoint": "namechange",
+      "minimum_points": null,
+      "url": "https://tushare.pro/document/2?doc_id=100",
+      "use": "Name intervals with start_date/end_date/ann_date/change_reason; possible ST reconstruction and cross-check.",
+      "limits": "Read endpoint page does not specify permission points; actual account permission not checked."
+    },
+    {
+      "provider": "Tushare",
+      "endpoint": "suspend_d",
+      "minimum_points": 2000,
+      "url": "https://tushare.pro/document/2?doc_id=214",
+      "use": "Daily halt/resume status from 2000-01-03 including intraday timing.",
+      "limits": "5000 rows/request; higher frequency documented at 5000 points."
+    },
+    {
+      "provider": "Tushare",
+      "endpoint": "daily_basic",
+      "minimum_points": 2000,
+      "url": "https://tushare.pro/document/2?doc_id=32",
+      "use": "Daily total_mv/circ_mv, pe/pe_ttm/pb and share counts; negative-earnings PE is empty, not zero.",
+      "limits": "6000 rows/request; documented units total_mv/circ_mv in CNY ten-thousand and shares in ten-thousand shares. Unlimited total volume at 5000 points."
+    },
+    {
+      "provider": "Tushare",
+      "endpoint": "index_member_all",
+      "minimum_points": 2000,
+      "url": "https://tushare.pro/document/2?doc_id=335",
+      "use": "Shenwan levels 1/2/3 with in_date/out_date and is_new; fetch historical and latest memberships because default is_new=Y.",
+      "limits": "2000 rows/request, unlimited total rows. Effective membership dates still require taxonomy-version and revision review."
+    },
+    {
+      "provider": "RQData",
+      "endpoint": "is_st_stock / is_suspended / get_instrument_industry / get_industry_change",
+      "minimum_points": null,
+      "url": "https://www.ricequant.com/doc/rqdata/python/stock-mod",
+      "use": "Official docs describe ranged historical ST/halt booleans, industry at a requested date, and industry start/cancel dates.",
+      "limits": "No account authenticated and no plan entitlement or trial coverage verified. API existence does not establish that the user has access. citics_2019 taxonomy requires historical-version care."
+    }
+  ],
+  "raw_metadata_files": [
+    "value_raw_metadata.json",
+    "suspension_raw_metadata.json"
+  ],
+  "observations": [
+    {
+      "endpoint": "stock_value_em",
+      "parameters": {
+        "symbol": "600000"
+      },
+      "akshare_version": "1.20.36",
+      "observed_utc": "2026-11-09T14:22:57.063399+00:00",
+      "status": "success",
+      "rows": 2146,
+      "columns": [
+        "数据日期",
+        "当日收盘价",
+        "当日涨跌幅",
+        "总市值",
+        "流通市值",
+        "总股本",
+        "流通股本",
+        "PE(TTM)",
+        "PE(静)",
+        "市净率",
+        "PEG值",
+        "市现率",
+        "市销率"
+      ],
+      "sha256": "cf2dd6e38dfcafbf73cdc2984f1ad29fd02c701011b4aae191129347557c989f",
+      "date_ranges": {
+        "数据日期": {
+          "min": "2018-01-02",
+          "max": "2026-11-09"
+        }
+      },
+      "seconds": 0.531
+    },
+    {
+      "endpoint": "stock_info_sz_change_name",
+      "parameters": {
+        "symbol": "简称变更"
+      },
+      "akshare_version": "1.20.36",
+      "observed_utc": "2026-11-09T14:24:47.167082+00:00",
+      "status": "success",
+      "rows": 7502,
+      "columns": [
+        "变更日期",
+        "证券代码",
+        "证券简称",
+        "变更前简称",
+        "变更后简称"
+      ],
+      "sha256": "97d45d2f6303fb592f025bd99a857dc1802b482203e3f86bcdda895de8f67bf2",
+      "date_ranges": {
+        "变更日期": {
+          "min": "1994-01-03",
+          "max": "2026-11-06"
+        }
+      },
+      "seconds": 1.469
+    },
+    {
+      "endpoint": "stock_info_sh_delist",
+      "parameters": {
+        "symbol": "全部"
+      },
+      "akshare_version": "1.20.36",
+      "observed_utc": "2026-11-09T14:24:50.404407+00:00",
+      "status": "success",
+      "rows": 161,
+      "columns": [
+        "公司代码",
+        "公司简称",
+        "上市日期",
+        "暂停上市日期"
+      ],
+      "sha256": "8573059e048c82b0e5e040cff4df9acb43400d1707af6e52c568085acb13a7ee",
+      "date_ranges": {
+        "上市日期": {
+          "min": "1990-12-19",
+          "max": "2023-02-01"
+        },
+        "暂停上市日期": {
+          "min": "2001-04-25",
+          "max": "2026-10-19"
+        }
+      },
+      "seconds": 0.594
+    },
+    {
+      "endpoint": "stock_info_sz_delist",
+      "parameters": {
+        "symbol": "终止上市公司"
+      },
+      "akshare_version": "1.20.36",
+      "observed_utc": "2026-11-09T14:24:52.761911+00:00",
+      "status": "success",
+      "rows": 212,
+      "columns": [
+        "证券代码",
+        "证券简称",
+        "上市日期",
+        "终止上市日期"
+      ],
+      "sha256": "6b71c907f9d351f1451bbc3bb52be1c3f96ab748ff573ce9ca98088587c653f1",
+      "date_ranges": {
+        "上市日期": {
+          "min": "1990-12-01",
+          "max": "2022-07-08"
+        },
+        "终止上市日期": {
+          "min": "1999-07-12",
+          "max": "2026-10-28"
+        }
+      },
+      "seconds": 0.672
+    },
+    {
+      "endpoint": "stock_tfp_em",
+      "parameters": {
+        "date": "20151221"
+      },
+      "akshare_version": "1.20.36",
+      "observed_utc": "2026-11-09T14:24:55.225769+00:00",
+      "status": "success",
+      "rows": 3738,
+      "columns": [
+        "序号",
+        "代码",
+        "名称",
+        "停牌时间",
+        "停牌截止时间",
+        "停牌期限",
+        "停牌原因",
+        "所属市场",
+        "预计复牌时间"
+      ],
+      "sha256": "e7d241045e4161ec7df70ce278b6ecd353bd15eb75dc32d6950fabbf75b3715a",
+      "date_ranges": {
+        "停牌时间": {
+          "min": "2015-06-29",
+          "max": "2026-11-10"
+        },
+        "停牌截止时间": {
+          "min": "2015-12-21",
+          "max": "2026-11-13"
+        },
+        "预计复牌时间": {
+          "min": "2015-12-22",
+          "max": "2026-11-16"
+        }
+      },
+      "seconds": 3.5
+    },
+    {
+      "endpoint": "stock_industry_change_cninfo",
+      "parameters": {
+        "symbol": "600000",
+        "start_date": "20100101",
+        "end_date": "20251231"
+      },
+      "akshare_version": "1.20.36",
+      "observed_utc": "2026-11-09T14:22:59.850502+00:00",
+      "status": "success",
+      "rows": 5,
+      "columns": [
+        "新证券简称",
+        "行业中类",
+        "行业大类",
+        "行业次类",
+        "行业门类",
+        "机构名称",
+        "行业编码",
+        "分类标准",
+        "分类标准编码",
+        "证券代码",
+        "变更日期"
+      ],
+      "sha256": "72d148afce827f2bc3afc6673bc85d0ba3f9642b18af84d3b3259e633f4ac7e5",
+      "date_ranges": {
+        "变更日期": {
+          "min": "2019-05-08",
+          "max": "2024-02-08"
+        }
+      },
+      "seconds": 0.657
+    },
+    {
+      "endpoint": "stock_industry_clf_hist_sw",
+      "parameters": {},
+      "akshare_version": "1.20.36",
+      "observed_utc": "2026-11-09T14:23:02.523089+00:00",
+      "status": "error",
+      "error_type": "SSLError",
+      "error": "HTTPSConnectionPool(host='www.swsresearch.com', port=443): Max retries exceeded with url: /swindex/pdf/SwClass2021/StockClassifyUse_stock.xls (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1010)')))",
+      "seconds": 0.25
+    }
+  ],
+  "local_evidence_directory": "data/source_probes"
+}

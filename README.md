@@ -2,7 +2,7 @@
 
 仓库：[OuyangYiming/a-share-multifactor](https://github.com/OuyangYiming/a-share-multifactor)（私有）.
 
-本项目按任务书分阶段实现，由本人学习和验收，Codex 协助编码与测试. 当前实现阶段 0 的单只股票日线示例及阶段 1 的五股数据试点，尚无因子有效性、策略收益或样本外研究结论.
+本项目按任务书分阶段实现，由本人学习和验收，Codex 协助编码与测试. 当前实现单股示例、五股行情试点、交易日历与基准、五股上市日期以及保留未知状态的样本筛选. 尚无因子有效性、策略收益或样本外研究结论.
 
 ## 环境与运行
 
@@ -26,7 +26,7 @@ python3.12 -m venv .venv
 .venv/bin/python -m pytest -q
 ```
 
-非 Windows 平台尚未实测. 安装依赖后，一条 `python run_all.py` 命令复现**阶段 0 和阶段 1 五股试点**，不是整个研究项目. 有全部缓存时可运行 `python run_all.py --offline`，确认不连接数据服务. 单独执行用 `--stage stage0` 或 `--stage stage1-pilot`.
+非 Windows 平台尚未实测. 安装依赖后，一条 `python run_all.py` 命令复现**已实现的行情、参考数据与五股筛选审计**，不是整个研究项目. 有全部缓存时可运行 `python run_all.py --offline`，确认不连接数据服务. 单独执行用 `--stage stage0`、`--stage stage1-pilot`、`--stage reference` 或 `--stage sample-audit`.
 
 ## 示例数据和输出
 
@@ -46,7 +46,7 @@ docs/         阶段讲解、验收记录、后续任务与数据限制
 notebooks/    交互练习目录，当前尚无 notebook
 report/       最终 LaTeX 报告目录，尚未编写正式研究报告
 results/      已实际运行的表、图、来源和验证记录
-src/          example.py 单股示例；data.py 五股双复权口径试点与覆盖审计
+src/          行情、参考数据、资格筛选与整合审计模块
 tests/        使用明确标注的构造数据检验程序边界
 requirements.txt
 run_all.py
@@ -54,9 +54,13 @@ run_all.py
 
 ## 学习与验收
 
-先阅读 `docs/stage0_walkthrough.md`，再按 `docs/acceptance.md` 记录运行与口头解释. 自动测试通过不能代替本人能讲清楚代码. 五股数据试点的说明和讲解见 `docs/stage1_data.md`；它不是全 A 股样本，也没有完成 ST、停牌及上市不足 60 个交易日的剔除.
+先阅读 `docs/stage0_walkthrough.md`，再按 `docs/acceptance.md` 记录运行与口头解释. 自动测试通过不能代替本人能讲清楚代码. 行情、参考数据和筛选规则分别见 `docs/stage1_data.md`、`docs/reference_data.md`、`docs/eligibility.md`.
 
 试点固定浦发银行、平安银行、贵州茅台、万科 A、宁德时代，分别获取不复权与后复权数据，核对日期集合并保留两种价格. 每股逐年覆盖、字段缺失及阶段未完成项保存在 `results/tables/stage1_*` 和 `results/stage1_audit.json`. 这些是指定样本的下载记录，不是随机抽查、外部行情核对或完整交易日覆盖证明. 未取得的历史状态保持未知，未输出虚构的全市场剔除数量.
+
+交易日历、沪深 300 和中证 500、五股上市日期已接入，见 `results/reference_audit.json`. 筛选规则只把已知 ST、停牌或上市不足 60 个交易日的记录归入相应排除项；历史状态缺失归为未知，不能当作合格样本. 五股实际结果为 59 条已知新股排除、12,307 条未知，出处为 `results/pilot_eligibility_audit.json` 和 `results/tables/pilot_sample_summary.csv`. “已证实合格为零”表示证据不足，不表示市场上没有可交易股票.
+
+项目总体进度以 `results/stage1_progress.json` 为准；`stage1_audit.json` 和 `stage1_field_coverage.csv` 仅描述行情接口本身提供的字段. 最新全套测试结果见 `results/current_test_summary.json`. 免费历史数据源的实测发现与拒绝使用的接口见 `docs/history_sources.md`，不把这些探测数据混入正式样本.
 
 ## 当前局限
 

@@ -1,0 +1,15 @@
+{
+  "scope": "Five preselected stocks, observed rows only; not full-market universe",
+  "input_rows": 12366,
+  "input_stocks": 5,
+  "known_new_stock_exclusions": 59,
+  "unknown_rows": 12307,
+  "eligible_rows": 0,
+  "st_status_obtained": false,
+  "suspension_status_obtained": false,
+  "vwap_outside_range": 0,
+  "vwap_relative_tolerance": 0.005,
+  "external_price_validation_completed": false,
+  "full_stage1_completed": false,
+  "interpretation": "Zero eligible rows means the supplied evidence cannot establish eligibility; it does not mean there were no tradable stocks."
+}

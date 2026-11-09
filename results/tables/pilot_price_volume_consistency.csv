@@ -1,0 +1,6 @@
+code,checked_rows,vwap_outside_range,relative_tolerance
+sh.600000,2642,0,0.005
+sh.600519,2674,0,0.005
+sz.000001,2674,0,0.005
+sz.000002,2539,0,0.005
+sz.300750,1837,0,0.005

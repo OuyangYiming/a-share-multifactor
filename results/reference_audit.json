@@ -1,0 +1,26 @@
+{
+  "scope": "calendar_two_indices_five_listing_dates",
+  "calendar_source_first_date": "1990-12-19",
+  "calendar_source_last_date": "2026-12-31",
+  "calendar_sessions": 8797,
+  "calendar_sessions_2015_2025": 2674,
+  "benchmarks": 2,
+  "benchmark_rows": 5348,
+  "listing_dates": 5,
+  "calendar_index_date_sets_equal_2015_2025": true,
+  "calendar_covers_pilot_listing_dates": true,
+  "pre_2015_cross_exchange_calendar_independently_verified": false,
+  "calendar_sdk_correction": "AKShare appends 1992-05-04 to Sina dates; no project-side date filling",
+  "benchmark_convention": "Vendor index OHLC via SDK qfq request; no total-return claim",
+  "security_master_scope": "Current exchange lists used only for the five historical listing dates",
+  "independent_quote_software_price_check_completed": false,
+  "full_historical_stock_universe_completed": false,
+  "still_missing": [
+    "historical_ST",
+    "suspension_status",
+    "historical_and_delisted_universe",
+    "point_in_time_industry",
+    "daily_total_market_cap",
+    "point_in_time_PE_PB"
+  ]
+}

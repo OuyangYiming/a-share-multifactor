@@ -1,0 +1,8 @@
+{
+  "tests": 168,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "command": "python -m pytest -q",
+  "scope": "Current price, reference, eligibility and orchestration unit tests; not full strategy no-lookahead certification"
+}
