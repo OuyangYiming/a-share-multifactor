@@ -1,0 +1,175 @@
+{
+  "scope": "Five preselected stocks, no universe exclusions or external price verification",
+  "snapshots": [
+    {
+      "source": "AKShare / Tencent",
+      "endpoint": "stock_zh_a_hist_tx",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_hist_tx.py",
+      "akshare_version": "1.20.36",
+      "request": {
+        "symbol": "sh600000",
+        "start_date": "20150101",
+        "end_date": "20251231",
+        "adjust": ""
+      },
+      "cache_file": "sh600000_20150101_20251231_none.csv",
+      "sha256": "0bcaa2964214781ccfc62216d80aa035b50d0f932d2a1f489a3f6cf7f56f6643",
+      "fetched_utc": "2026-11-09T13:30:27.840875+00:00",
+      "representation": "SDK DataFrame serialized as CSV; not raw HTTP bytes",
+      "identity_and_adjustment": "Added from request; external validation pending"
+    },
+    {
+      "source": "AKShare / Tencent",
+      "endpoint": "stock_zh_a_hist_tx",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_hist_tx.py",
+      "akshare_version": "1.20.36",
+      "request": {
+        "symbol": "sh600000",
+        "start_date": "20150101",
+        "end_date": "20251231",
+        "adjust": "hfq"
+      },
+      "cache_file": "sh600000_20150101_20251231_hfq.csv",
+      "sha256": "544a9f65cc83ad8e924f1c7db5698149655d4ed263b55fb23dd30cdf82e199e0",
+      "fetched_utc": "2026-11-09T13:30:30.768884+00:00",
+      "representation": "SDK DataFrame serialized as CSV; not raw HTTP bytes",
+      "identity_and_adjustment": "Added from request; external validation pending"
+    },
+    {
+      "source": "AKShare / Tencent",
+      "endpoint": "stock_zh_a_hist_tx",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_hist_tx.py",
+      "akshare_version": "1.20.36",
+      "request": {
+        "symbol": "sz000001",
+        "start_date": "20150101",
+        "end_date": "20251231",
+        "adjust": ""
+      },
+      "cache_file": "sz000001_20150101_20251231_none.csv",
+      "sha256": "0b94f23e44fc1fdf566d2c687b3edf432b091c6ed1515161da5670f2fdbde147",
+      "fetched_utc": "2026-11-09T13:30:33.664082+00:00",
+      "representation": "SDK DataFrame serialized as CSV; not raw HTTP bytes",
+      "identity_and_adjustment": "Added from request; external validation pending"
+    },
+    {
+      "source": "AKShare / Tencent",
+      "endpoint": "stock_zh_a_hist_tx",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_hist_tx.py",
+      "akshare_version": "1.20.36",
+      "request": {
+        "symbol": "sz000001",
+        "start_date": "20150101",
+        "end_date": "20251231",
+        "adjust": "hfq"
+      },
+      "cache_file": "sz000001_20150101_20251231_hfq.csv",
+      "sha256": "3fc3188c44a058ddeb061bda50ae68783a64e104bdd1c6d6a9353d6f9d5d0743",
+      "fetched_utc": "2026-11-09T13:30:36.608918+00:00",
+      "representation": "SDK DataFrame serialized as CSV; not raw HTTP bytes",
+      "identity_and_adjustment": "Added from request; external validation pending"
+    },
+    {
+      "source": "AKShare / Tencent",
+      "endpoint": "stock_zh_a_hist_tx",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_hist_tx.py",
+      "akshare_version": "1.20.36",
+      "request": {
+        "symbol": "sh600519",
+        "start_date": "20150101",
+        "end_date": "20251231",
+        "adjust": ""
+      },
+      "cache_file": "sh600519_20150101_20251231_none.csv",
+      "sha256": "2b4c5c1f77406b3571da6e413b20b8af58cabe1556cddb2cc0c2a89f532c8f5a",
+      "fetched_utc": "2026-11-09T13:30:39.490346+00:00",
+      "representation": "SDK DataFrame serialized as CSV; not raw HTTP bytes",
+      "identity_and_adjustment": "Added from request; external validation pending"
+    },
+    {
+      "source": "AKShare / Tencent",
+      "endpoint": "stock_zh_a_hist_tx",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_hist_tx.py",
+      "akshare_version": "1.20.36",
+      "request": {
+        "symbol": "sh600519",
+        "start_date": "20150101",
+        "end_date": "20251231",
+        "adjust": "hfq"
+      },
+      "cache_file": "sh600519_20150101_20251231_hfq.csv",
+      "sha256": "f72fd17781dc9a67b6b8d307edeb16994e8b9c879c9ff1c2dd1d0c892248060a",
+      "fetched_utc": "2026-11-09T13:30:42.616249+00:00",
+      "representation": "SDK DataFrame serialized as CSV; not raw HTTP bytes",
+      "identity_and_adjustment": "Added from request; external validation pending"
+    },
+    {
+      "source": "AKShare / Tencent",
+      "endpoint": "stock_zh_a_hist_tx",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_hist_tx.py",
+      "akshare_version": "1.20.36",
+      "request": {
+        "symbol": "sz000002",
+        "start_date": "20150101",
+        "end_date": "20251231",
+        "adjust": ""
+      },
+      "cache_file": "sz000002_20150101_20251231_none.csv",
+      "sha256": "050f55b52265cea9aa4ab547b47211d9957078681ceaf600856e86592ae36dc7",
+      "fetched_utc": "2026-11-09T13:30:45.692742+00:00",
+      "representation": "SDK DataFrame serialized as CSV; not raw HTTP bytes",
+      "identity_and_adjustment": "Added from request; external validation pending"
+    },
+    {
+      "source": "AKShare / Tencent",
+      "endpoint": "stock_zh_a_hist_tx",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_hist_tx.py",
+      "akshare_version": "1.20.36",
+      "request": {
+        "symbol": "sz000002",
+        "start_date": "20150101",
+        "end_date": "20251231",
+        "adjust": "hfq"
+      },
+      "cache_file": "sz000002_20150101_20251231_hfq.csv",
+      "sha256": "c0de93c56d07562b7c6a2af8ae7bc29f4b85a4769db3180881f185000b41763f",
+      "fetched_utc": "2026-11-09T13:30:48.599437+00:00",
+      "representation": "SDK DataFrame serialized as CSV; not raw HTTP bytes",
+      "identity_and_adjustment": "Added from request; external validation pending"
+    },
+    {
+      "source": "AKShare / Tencent",
+      "endpoint": "stock_zh_a_hist_tx",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_hist_tx.py",
+      "akshare_version": "1.20.36",
+      "request": {
+        "symbol": "sz300750",
+        "start_date": "20150101",
+        "end_date": "20251231",
+        "adjust": ""
+      },
+      "cache_file": "sz300750_20150101_20251231_none.csv",
+      "sha256": "e836bd379564b434a20ffaf746da5f6e84883c57ef7840db129c17303b7c16e5",
+      "fetched_utc": "2026-11-09T13:30:50.706614+00:00",
+      "representation": "SDK DataFrame serialized as CSV; not raw HTTP bytes",
+      "identity_and_adjustment": "Added from request; external validation pending"
+    },
+    {
+      "source": "AKShare / Tencent",
+      "endpoint": "stock_zh_a_hist_tx",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_hist_tx.py",
+      "akshare_version": "1.20.36",
+      "request": {
+        "symbol": "sz300750",
+        "start_date": "20150101",
+        "end_date": "20251231",
+        "adjust": "hfq"
+      },
+      "cache_file": "sz300750_20150101_20251231_hfq.csv",
+      "sha256": "6faf03f3cea8d71897d390960d879cde21f2a33f2db62d9f156db2de0e409874",
+      "fetched_utc": "2026-11-09T13:30:52.815350+00:00",
+      "representation": "SDK DataFrame serialized as CSV; not raw HTTP bytes",
+      "identity_and_adjustment": "Added from request; external validation pending"
+    }
+  ]
+}

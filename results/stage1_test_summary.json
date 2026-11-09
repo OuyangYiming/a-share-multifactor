@@ -1,0 +1,10 @@
+{
+  "tests": 87,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "seconds": 1.638,
+  "command": "python -m pytest -q",
+  "stage1_test_count": 50,
+  "scope": "Full current unit suite: stage 0 and stage 1 pilot; fixtures only; not external price validation or a backtest audit"
+}
