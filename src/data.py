@@ -152,16 +152,42 @@ def _price_blocks(start, end, years=4):
         cursor = last + pd.Timedelta(days=1)
 
 
-def load_stock(root, client, code, offline=False):
+def _session_blocks(calendar, start, end):
+    calendar = pd.DatetimeIndex(calendar)
+    if calendar.empty or not calendar.is_unique or not calendar.is_monotonic_increasing:
+        raise ValueError('A sorted, unique trading calendar is required')
+    cursor, end = pd.Timestamp(start), pd.Timestamp(end)
+    sessions = calendar[(calendar >= cursor) & (calendar <= end)]
+    if sessions.empty:
+        raise ValueError(f'No trading sessions from {cursor.date()} to {end.date()}')
+    if len(sessions) < 2000:
+        yield cursor.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')
+        return
+    for offset in range(0, len(sessions), 1900):
+        last = sessions[min(offset + 1899, len(sessions) - 1)]
+        if offset + 1900 >= len(sessions):
+            last = end
+        yield cursor.strftime('%Y-%m-%d'), last.strftime('%Y-%m-%d')
+        cursor = last + pd.Timedelta(days=1)
+
+
+def load_stock(root, client, code, offline=False, calendar=None, start_date=None):
     folder = Path(root) / 'data/mvp'
     ready = folder / 'daily' / f'{code}.csv'
     if ready.exists():
         return pd.read_csv(ready, parse_dates=['date'], dtype={'code':str})
     pieces = []
-    old_blocks = list(_price_blocks(DATA_START, DATA_END, years=4))
-    has_old_cache = any((folder / 'raw' / f'{code}_{first}_{last}.csv').exists()
-                        for first, last in old_blocks)
-    blocks = old_blocks if has_old_cache else _price_blocks(DATA_START, DATA_END, years=5)
+    legacy_plans = [list(_price_blocks(DATA_START, DATA_END, years=years)) for years in (4, 5)]
+    blocks = next((plan for plan in legacy_plans
+                   if any((folder / 'raw' / f'{code}_{first}_{last}.csv').exists()
+                          for first, last in plan)), None)
+    if blocks is None:
+        if calendar is not None:
+            blocks = _session_blocks(calendar, start_date or DATA_START, DATA_END)
+        elif start_date is not None:
+            raise ValueError('calendar is required when start_date is supplied')
+        else:
+            blocks = legacy_plans[1]
     for first, last in blocks:
         path = folder / 'raw' / f'{code}_{first}_{last}.csv'
         pieces.append(_cached(client, path, 'query_history_k_data_plus', offline,
@@ -198,15 +224,43 @@ def load_research_data(root, offline=False, constituents_only=False):
         if constituents_only:
             return None, constituents, calendar
         codes = sorted(constituents.code.unique())
+        if not codes:
+            raise ValueError('No historical constituents')
+        first_signals = constituents.groupby('code').signal_date.min().reindex(codes)
+        positions = calendar.get_indexer(pd.DatetimeIndex(first_signals))
+        insufficient = [code for code, position in zip(codes, positions) if position < 252]
+        if insufficient:
+            raise ValueError(f'Fewer than 252 pre-signal trading sessions: {insufficient}')
+        start_dates = dict(zip(codes, calendar[positions - 252].strftime('%Y-%m-%d')))
+        start_dates[codes[0]] = DATA_START
         print(f'Daily download: {len(codes)} historical constituents, {DATA_START} to {DATA_END}', flush=True)
-        frames = []
+        frames, pending = {}, {}
         started = time.monotonic()
         for number, code in enumerate(codes, 1):
-            frame = load_stock(root, client, code, offline)
-            frames.append(frame)
+            try:
+                frames[code] = load_stock(root, client, code, offline,
+                                          calendar=calendar, start_date=start_dates[code])
+            except Exception as exc:
+                pending[code] = f'{type(exc).__name__}: {exc}'
+                print(f'Deferred {code}: {pending[code]}', flush=True)
             if number % 10 == 0 or number == len(codes):
                 elapsed = time.monotonic() - started
-                print(f'Daily {number}/{len(codes)}; rows={sum(len(x) for x in frames)}; elapsed={elapsed:.1f}s; last={code}', flush=True)
-        return pd.concat(frames, ignore_index=True), constituents, calendar
+                print(f'Daily {number}/{len(codes)}; rows={sum(len(x) for x in frames.values())}; elapsed={elapsed:.1f}s; last={code}; completed={len(frames)}; deferred={len(pending)}', flush=True)
+        if pending:
+            print(f'Deferred retry pass: {len(pending)} stocks', flush=True)
+            for code in list(pending):
+                try:
+                    frames[code] = load_stock(root, client, code, offline,
+                                              calendar=calendar, start_date=start_dates[code])
+                except Exception as exc:
+                    pending[code] = f'{type(exc).__name__}: {exc}'
+                    print(f'Still failed {code}: {pending[code]}', flush=True)
+                else:
+                    del pending[code]
+                    print(f'Recovered {code}; completed={len(frames)}/{len(codes)}', flush=True)
+        if pending:
+            detail = '; '.join(f'{code}: {error}' for code, error in pending.items())
+            raise RuntimeError(f'Incomplete data for {len(pending)} historical constituents: {detail}')
+        return pd.concat([frames[code] for code in codes], ignore_index=True), constituents, calendar
     finally:
         client.close()
