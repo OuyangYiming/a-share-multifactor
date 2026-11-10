@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.backtest import can_trade, run_backtest, transaction_cost
+from src.backtest import can_trade, rebalance_summary, run_backtest, transaction_cost
 from src.evaluate import calculate_rank_ic
 from src.factors import build_signals
 
@@ -260,8 +260,10 @@ def test_trade_gate_handles_limits_suspension_and_cent_rounding():
         assert not can_trade({**row, "open": 10.05, "tradestatus": pd.NA}, side, "2020-08-24")
         assert not can_trade({**row, "open": 10.05, "isST": pd.NA}, side, "2020-08-24")
         assert not can_trade({**row, "open": np.nan}, side, "2020-08-24")
-        assert not can_trade({**row, "volume": 0}, side, "2020-08-24")
         assert not can_trade({**row, "preclose": np.nan}, side, "2020-08-24")
+        # Full-session volume is not known when the opening order is placed.
+        for volume in [0, np.nan, 1_000_000]:
+            assert can_trade({**row, "open": 10.05, "volume": volume}, side, "2020-08-24")
 
     calendar = pd.bdate_range("2019-01-02", "2019-03-05")
     prices = _price_panel(calendar)
@@ -294,6 +296,42 @@ def test_trade_gate_handles_limits_suspension_and_cent_rounding():
         assert orders.iloc[0]["cost"] == 0
     # The blocked sale must leave the existing holding in the account.
     assert nav.loc["2019-03-01", "Q1"] == pytest.approx(1.0)
+
+    short_prices = prices.copy(deep=True)
+    short_prices[["open", "high", "low"]] = 10.0
+    short_prices.loc[blocked_buy, ["open", "low"]] = 9.0
+    short_prices.loc[blocked_sell, ["open", "high"]] = 11.0
+    short_nav, short_trades, short_forward = run_backtest(
+        short_prices, signals, calendar, "2019-01-02", "2019-03-05", 0,
+        include_long_short=True,
+    )
+    # Opening a short is a sell; covering that short is a buy.
+    for portfolio in ["long_short", "long_short_gross"]:
+        for date, code, side, reason in [
+            ("2019-02-01", CODES[0], "sell", "limit_down"),
+            ("2019-03-01", CODES[1], "buy", "limit_up"),
+        ]:
+            orders = short_trades.loc[
+                short_trades["portfolio"].eq(portfolio) & short_trades["code"].eq(code)
+                & pd.to_datetime(short_trades["date"]).eq(pd.Timestamp(date))
+                & short_trades["side"].eq(side)
+            ]
+            assert len(orders) == 1
+            assert orders.iloc[0]["reason"] == reason
+            assert orders.iloc[0]["notional"] == orders.iloc[0]["cost"] == 0
+        assert short_nav.attrs["ending_positions"][portfolio][CODES[1]] == pytest.approx(-0.05)
+        assert short_nav.loc["2019-03-01", portfolio] == pytest.approx(1.0)
+
+    changed_volume = short_prices.copy(deep=True)
+    changed_volume["volume"] = np.resize([0.0, np.nan, 1e15], len(changed_volume))
+    volume_nav, volume_trades, volume_forward = run_backtest(
+        changed_volume, signals, calendar, "2019-01-02", "2019-03-05", 0,
+        include_long_short=True,
+    )
+    for original, changed in [
+        (short_nav, volume_nav), (short_trades, volume_trades), (short_forward, volume_forward),
+    ]:
+        pd.testing.assert_frame_equal(original, changed, check_exact=True)
 
 
 def test_transaction_costs_and_cash_constraint():
@@ -345,3 +383,100 @@ def test_transaction_costs_and_cash_constraint():
         rtol=0, atol=1e-12,
     )
     np.testing.assert_allclose(nav[["Q3", "benchmark"]].iloc[-1], 1 / (1 + rate), rtol=0, atol=1e-12)
+
+    # Turnover uses opening equity before all orders, including establishment.
+    turnover = rebalance_summary(nav).set_index(["date", "portfolio"])
+    assert len(turnover) == 2 * len(nav.columns)
+    for portfolio in nav.columns:
+        first_rebalance = turnover.loc[(pd.Timestamp("2019-02-01"), portfolio)]
+        assert first_rebalance["pre_trade_nav"] == 1.0
+        assert first_rebalance["turnover"] == pytest.approx(1 / (1 + rate))
+    for portfolio in ["Q3", "benchmark"]:
+        unchanged = turnover.loc[(pd.Timestamp("2019-03-01"), portfolio)]
+        assert unchanged[["buy_notional", "sell_notional", "cost", "turnover"]].eq(0).all()
+    np.testing.assert_allclose(turnover["one_way_turnover"], turnover["turnover"] / 2)
+
+    zero_nav, _, _ = run_backtest(
+        prices, signals, calendar, "2019-01-02", "2019-03-05", 0, include_long_short=True,
+    )
+    ls_nav, ls_trades, _ = run_backtest(
+        prices, signals, calendar, "2019-01-02", "2019-03-05", 15, include_long_short=True,
+    )
+    assert set(ls_nav.columns) == set(nav.columns) | {"long_short", "long_short_gross"}
+    pd.testing.assert_series_equal(
+        ls_nav["long_short_gross"], zero_nav["long_short"], check_names=False, check_exact=True,
+    )
+    ls_turnover = rebalance_summary(ls_nav).set_index(["date", "portfolio"])
+    assert len(ls_turnover) == 2 * len(ls_nav.columns)
+    for portfolio, leg_rate in [("long_short", 0.0015), ("long_short_gross", 0.0)]:
+        assert ls_nav.attrs["portfolio_cost_bps"][portfolio] == pytest.approx(leg_rate * 10000)
+        orders = ls_trades.loc[ls_trades["portfolio"].eq(portfolio)]
+        assert orders["reason"].eq("rebalance").all()
+        entry = orders.loc[pd.to_datetime(orders["date"]).eq(pd.Timestamp("2019-02-01"))]
+        rotation = orders.loc[pd.to_datetime(orders["date"]).eq(pd.Timestamp("2019-03-01"))]
+        assert set(entry.loc[entry["side"].eq("sell"), "code"]) == set(CODES[:2])
+        assert set(entry.loc[entry["side"].eq("buy"), "code"]) == set(CODES[-2:])
+        assert set(rotation.loc[rotation["side"].eq("buy"), "code"]) == set(CODES[:2])
+        assert set(rotation.loc[rotation["side"].eq("sell"), "code"]) == set(CODES[-2:])
+        np.testing.assert_allclose(entry.groupby("side")["notional"].sum(), 1.0)
+        np.testing.assert_allclose(orders["cost"], orders["notional"] * leg_rate)
+        assert entry["cost"].sum() == pytest.approx(2 * leg_rate)
+        # Rotation closes each old leg and opens the opposite leg at the new NAV.
+        pre_rotation_nav = 1 - 2 * leg_rate
+        np.testing.assert_allclose(rotation.groupby("side")["notional"].sum(), 1 + pre_rotation_nav)
+        assert rotation["cost"].sum() == pytest.approx(2 * (1 + pre_rotation_nav) * leg_rate)
+        assert ls_nav.loc["2019-02-01", portfolio] == pytest.approx(pre_rotation_nav)
+        assert ls_nav[portfolio].iloc[-1] == pytest.approx(1 - 6 * leg_rate + 4 * leg_rate ** 2)
+        assert ls_nav[portfolio].iloc[-1] == pytest.approx(1 - orders["cost"].sum())
+        positions = ls_nav.attrs["ending_positions"][portfolio]
+        for code in CODES[:2]:
+            assert positions[code] == pytest.approx(pre_rotation_nav / 20)
+        for code in CODES[-2:]:
+            assert positions[code] == pytest.approx(-pre_rotation_nav / 20)
+        cash_changes = np.where(
+            orders["side"].eq("sell"), orders["notional"] - orders["cost"],
+            -orders["notional"] - orders["cost"],
+        )
+        cash_after_each_fill = 1 + np.cumsum(cash_changes)
+        assert (cash_after_each_fill >= -1e-12).all()
+        assert ls_nav.attrs["ending_cash"][portfolio] == pytest.approx(cash_after_each_fill[-1], abs=1e-12)
+        for date, batch, expected_nav in [
+            ("2019-02-01", entry, 1.0), ("2019-03-01", rotation, pre_rotation_nav),
+        ]:
+            ledger = ls_turnover.loc[(pd.Timestamp(date), portfolio)]
+            np.testing.assert_allclose(batch["pre_trade_nav"], expected_nav)
+            assert ledger["pre_trade_nav"] == pytest.approx(expected_nav)
+            assert ledger["turnover"] == pytest.approx(batch["notional"].sum() / expected_nav)
+            assert ledger["one_way_turnover"] == pytest.approx(ledger["turnover"] / 2)
+    assert min(ls_nav.attrs["min_cash"].values()) >= -1e-12
+
+    # Fixed signed shares give 1 -> 1.2 -> 1.4, unlike daily weight resets.
+    moving_prices = prices.copy(deep=True)
+    for codes, levels in [(CODES[-2:], [11.0, 12.0]), (CODES[:2], [9.0, 8.0])]:
+        for date, level in zip(["2019-02-04", "2019-02-05"], levels):
+            selected = moving_prices["code"].isin(codes) & moving_prices["date"].ge(pd.Timestamp(date))
+            moving_prices.loc[selected, ["open", "high", "low", "close", "adj_close"]] = level
+    for codes, opening in [(CODES[-2:], 11.5), (CODES[:2], 8.5)]:
+        selected = moving_prices["code"].isin(codes) & moving_prices["date"].eq(pd.Timestamp("2019-03-01"))
+        moving_prices.loc[selected, "open"] = opening
+    moving_prices["preclose"] = moving_prices.groupby("code", sort=False)["close"].shift().fillna(10.0)
+    moving_prices["high"] = moving_prices[["open", "close"]].max(axis=1)
+    moving_prices["low"] = moving_prices[["open", "close"]].min(axis=1)
+    moving_nav, moving_trades, _ = run_backtest(
+        moving_prices, signals, calendar, "2019-01-02", "2019-03-05", 15, include_long_short=True,
+    )
+    moving_turnover = rebalance_summary(moving_nav).set_index(["date", "portfolio"])
+    for portfolio, initial_fee in [("long_short", 0.003), ("long_short_gross", 0.0)]:
+        np.testing.assert_allclose(
+            moving_nav.loc[["2019-02-01", "2019-02-04", "2019-02-05"], portfolio],
+            np.array([1.0, 1.2, 1.4]) - initial_fee, rtol=0, atol=1e-12,
+        )
+        orders = moving_trades.loc[moving_trades["portfolio"].eq(portfolio)]
+        assert set(pd.to_datetime(orders["date"])) == {pd.Timestamp("2019-02-01"), pd.Timestamp("2019-03-01")}
+        # The next opening NAV is 1.3 less fees; the preceding close is 1.4 less fees.
+        rotation = orders.loc[pd.to_datetime(orders["date"]).eq(pd.Timestamp("2019-03-01"))]
+        ledger = moving_turnover.loc[(pd.Timestamp("2019-03-01"), portfolio)]
+        assert moving_nav.loc["2019-02-28", portfolio] == pytest.approx(1.4 - initial_fee)
+        np.testing.assert_allclose(rotation["pre_trade_nav"], 1.3 - initial_fee)
+        assert ledger["pre_trade_nav"] == pytest.approx(1.3 - initial_fee)
+        assert ledger["turnover"] == pytest.approx(rotation["notional"].sum() / (1.3 - initial_fee))

@@ -1,4 +1,4 @@
-"""Monthly long-only portfolios with next-session opening execution."""
+"""Monthly portfolios with next-session opening execution."""
 
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
@@ -7,8 +7,11 @@ import pandas as pd
 
 
 PORTFOLIOS = ('Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'benchmark')
-TRADE_COLUMNS = ('date', 'portfolio', 'code', 'side', 'notional', 'cost', 'reason')
+TRADE_COLUMNS = ('date', 'portfolio', 'code', 'side', 'notional', 'cost', 'reason', 'pre_trade_nav')
 FORWARD_COLUMNS = ('date', 'code', 'forward_return')
+REBALANCE_COLUMNS = ('date', 'portfolio', 'pre_trade_nav', 'buy_notional',
+                     'sell_notional', 'cost', 'turnover', 'one_way_turnover')
+STALE_COLUMNS = ('portfolio', 'code', 'stale_days')
 _EPS = 1e-12
 
 
@@ -46,8 +49,6 @@ def _trade_block_reason(row, side: str, date) -> str:
     status = _flag(row.get('tradestatus'))
     if status is not True:
         return 'suspended' if status is False else 'missing_tradestatus'
-    if not _positive(row.get('volume')):
-        return 'no_volume'
     if not _positive(row.get('open')):
         return 'missing_open'
     if not _positive(row.get('preclose')):
@@ -81,7 +82,8 @@ def can_trade(row, side: str, date) -> bool:
     """Gate an opening order using raw prices and the historical board/ST rule.
 
     Prices at or beyond the rounded upper limit block buys; prices at or below
-    the lower limit block sells. Status/volume failures block both directions.
+    the lower limit block sells. Unknown status blocks both directions. Daily
+    total volume is not available at the open and is not an execution gate.
     """
     return not _trade_block_reason(row, side, date)
 
@@ -106,14 +108,31 @@ def _next_month_open(calendar: pd.DatetimeIndex, execution_date):
     return calendar[position]
 
 
-def _record(trades, date, portfolio, code, side, notional=0.0, cost=0.0, reason='rebalance'):
-    trades.append((date, portfolio, code, side, float(notional), float(cost), reason))
+def _record(trades, date, portfolio, code, side, notional=0.0, cost=0.0,
+            reason='rebalance', *, pre_trade_nav):
+    trades.append((date, portfolio, code, side, float(notional), float(cost),
+                   reason, float(pre_trade_nav)))
+
+
+def _record_rebalance(records, trades, first_trade, date, portfolio, equity):
+    if records is None:
+        return
+    orders = trades[first_trade:]
+    bought = sum(order[4] for order in orders if order[3] == 'buy')
+    sold = sum(order[4] for order in orders if order[3] == 'sell')
+    cost = sum(order[5] for order in orders)
+    turnover = (bought + sold) / equity
+    records.append((date, portfolio, float(equity), bought, sold, cost,
+                    turnover, turnover / 2.0))
 
 
 def _rebalance(positions, cash, target_indices, opening_marks, rows, codes,
-               date, portfolio, cost_bps, trades):
+               date, portfolio, cost_bps, trades, rebalance_records=None):
     """Keep blocked holdings, sell excess first, then scale all affordable buys."""
     equity = cash + float(positions @ opening_marks)
+    if not _positive(equity):
+        raise ArithmeticError('Pre-trade NAV must be positive and finite.')
+    first_trade = len(trades)
     desired = np.zeros(len(codes), dtype=float)
     if len(target_indices):
         desired[target_indices] = equity / len(target_indices)
@@ -128,7 +147,7 @@ def _rebalance(positions, cash, target_indices, opening_marks, rows, codes,
         if not reason and not _positive(row.get('_adj_open')):
             reason = 'missing_adjusted_open'
         if reason:
-            _record(trades, date, portfolio, code, 'sell', reason=reason)
+            _record(trades, date, portfolio, code, 'sell', reason=reason, pre_trade_nav=equity)
             continue
         price = float(row['_adj_open'])
         quantity = min(positions[index], excess / price)
@@ -138,7 +157,7 @@ def _rebalance(positions, cash, target_indices, opening_marks, rows, codes,
         if abs(positions[index]) < _EPS:
             positions[index] = 0.0
         cash += notional - cost
-        _record(trades, date, portfolio, code, 'sell', notional, cost)
+        _record(trades, date, portfolio, code, 'sell', notional, cost, pre_trade_nav=equity)
     pending = []
     for index in target_indices:
         deficit = desired[index] - positions[index] * opening_marks[index]
@@ -150,7 +169,7 @@ def _rebalance(positions, cash, target_indices, opening_marks, rows, codes,
         if not reason and not _positive(row.get('_adj_open')):
             reason = 'missing_adjusted_open'
         if reason:
-            _record(trades, date, portfolio, code, 'buy', reason=reason)
+            _record(trades, date, portfolio, code, 'buy', reason=reason, pre_trade_nav=equity)
             continue
         pending.append((index, deficit, float(row['_adj_open'])))
     required = sum(notional + transaction_cost(notional, cost_bps) for _, notional, _ in pending)
@@ -162,14 +181,77 @@ def _rebalance(positions, cash, target_indices, opening_marks, rows, codes,
         cost = transaction_cost(notional, cost_bps)
         positions[index] += notional / price
         cash -= notional + cost
-        _record(trades, date, portfolio, codes[index], 'buy', notional, cost)
+        _record(trades, date, portfolio, codes[index], 'buy', notional, cost, pre_trade_nav=equity)
     if cash < -_EPS or (positions < -_EPS).any():
         raise ArithmeticError('Execution would create borrowing or a short position.')
+    _record_rebalance(rebalance_records, trades, first_trade, date, portfolio, equity)
     return max(cash, 0.0)
 
 
+def _rebalance_long_short(positions, cash, long_indices, short_indices, opening_marks,
+                          rows, codes, date, portfolio, cost_bps, trades, rebalance_records):
+    """Target each leg at 100% of pre-trade equity; keep actual signed holdings.
+
+    This research account assumes unlimited stock borrow, no borrow charges or
+    interest, and immediately usable short proceeds. Buy/sell gates apply to the
+    actual order direction, including covers and short sales. Costs, blocked
+    orders and subsequent price moves can move exposure away from the target.
+    """
+    equity = cash + float(positions @ opening_marks)
+    if not _positive(equity):
+        raise ArithmeticError(f'{portfolio} has nonpositive or nonfinite opening equity at {date}.')
+    first_trade = len(trades)
+    desired = np.zeros(len(codes))
+    desired[long_indices] = equity / len(long_indices)
+    desired[short_indices] = -equity / len(short_indices)
+    for index in np.flatnonzero(positions * opening_marks - desired > _EPS):
+        code = codes[index]
+        row = rows.get(code)
+        reason = _trade_block_reason(row, 'sell', date)
+        if not reason and not _positive(row.get('_adj_open')):
+            reason = 'missing_adjusted_open'
+        if reason:
+            _record(trades, date, portfolio, code, 'sell', reason=reason, pre_trade_nav=equity)
+            continue
+        notional = positions[index] * opening_marks[index] - desired[index]
+        cost = transaction_cost(notional, cost_bps)
+        positions[index] -= notional / float(row['_adj_open'])
+        cash += notional - cost
+        _record(trades, date, portfolio, code, 'sell', notional, cost, pre_trade_nav=equity)
+    pending = []
+    for index in np.flatnonzero(desired - positions * opening_marks > _EPS):
+        code = codes[index]
+        row = rows.get(code)
+        reason = _trade_block_reason(row, 'buy', date)
+        if not reason and not _positive(row.get('_adj_open')):
+            reason = 'missing_adjusted_open'
+        if reason:
+            _record(trades, date, portfolio, code, 'buy', reason=reason, pre_trade_nav=equity)
+            continue
+        pending.append((index, desired[index] - positions[index] * opening_marks[index],
+                        float(row['_adj_open'])))
+    required = sum(value + transaction_cost(value, cost_bps) for _, value, _ in pending)
+    scale = min(1.0, max(cash, 0.0) / required) if required > 0 else 0.0
+    for index, requested, price in pending:
+        notional = requested * scale
+        if notional <= _EPS:
+            continue
+        cost = transaction_cost(notional, cost_bps)
+        positions[index] += notional / price
+        cash -= notional + cost
+        _record(trades, date, portfolio, codes[index], 'buy', notional, cost, pre_trade_nav=equity)
+    if cash < -_EPS:
+        raise ArithmeticError('Long-short execution would create negative cash.')
+    cash = max(cash, 0.0)
+    if not _positive(cash + float(positions @ opening_marks)):
+        raise ArithmeticError(f'{portfolio} has nonpositive or nonfinite equity after costs at {date}.')
+    _record_rebalance(rebalance_records, trades, first_trade, date, portfolio, equity)
+    return cash
+
+
 def run_backtest(prices: pd.DataFrame, signals: pd.DataFrame, calendar: pd.DatetimeIndex,
-                 start='2018-01-01', end='2025-12-31', cost_bps=15.0):
+                 start='2018-01-01', end='2025-12-31', cost_bps=15.0,
+                 include_long_short=False):
     """Return closing NAVs, opening order records, and independent forward labels.
 
     Each portfolio starts with cash 1. Signals must already describe the eligible
@@ -179,10 +261,20 @@ def run_backtest(prices: pd.DataFrame, signals: pd.DataFrame, calendar: pd.Datet
     the same execution/cost rules. Blocked attempts have zero notional and cost.
     Future labels use observed adjusted opens only, without transaction gates or
     costs; their date is the signal date. Incomplete labels remain NaN.
+
+    include_long_short adds independent monthly Q5-long/Q1-short accounts:
+    long_short pays cost_bps; long_short_gross pays zero costs. Each leg targets
+    100% of pre-trade equity, with signed positions held between rebalances.
+    rebalance_summary(nav) includes zero-trade months and the initial purchase;
+    stale_valuation_summary(nav) counts held stock-days using a prior close.
     """
     transaction_cost(0, cost_bps)
     if cost_bps >= 10000:
         raise ValueError('One-way trading cost must be below 100 percent.')
+    portfolios = PORTFOLIOS + (('long_short', 'long_short_gross') if include_long_short else ())
+    portfolio_costs = [float(cost_bps)] * len(PORTFOLIOS)
+    if include_long_short:
+        portfolio_costs += [float(cost_bps), 0.0]
     if not isinstance(calendar, pd.DatetimeIndex):
         raise TypeError('calendar must be a DatetimeIndex.')
     calendar = _dates(calendar, 'calendar')
@@ -195,7 +287,7 @@ def run_backtest(prices: pd.DataFrame, signals: pd.DataFrame, calendar: pd.Datet
     if sessions.empty:
         raise ValueError('No trading sessions in the requested interval.')
     price_fields = ['date', 'code', 'open', 'close', 'preclose', 'adj_close',
-                    'volume', 'isST', 'tradestatus']
+                    'isST', 'tradestatus']
     if not set(price_fields).issubset(prices) or not {'date', 'code', 'score'}.issubset(signals):
         raise ValueError('Prices or signals are missing required columns.')
     if not prices.columns.is_unique or not signals.columns.is_unique:
@@ -248,7 +340,7 @@ def run_backtest(prices: pd.DataFrame, signals: pd.DataFrame, calendar: pd.Datet
         raise ValueError('Duplicate daily price date/code key.')
     if not table['date'].isin(sessions).all():
         raise ValueError('A price observation is outside the supplied trading sessions.')
-    for field in ('open', 'close', 'preclose', 'adj_close', 'volume'):
+    for field in ('open', 'close', 'preclose', 'adj_close'):
         table[field] = pd.to_numeric(table[field], errors='raise')
     raw_close, adjusted_close = table['close'].to_numpy(dtype=float), table['adj_close'].to_numpy(dtype=float)
     adjustment = np.full(len(table), np.nan)
@@ -261,6 +353,10 @@ def run_backtest(prices: pd.DataFrame, signals: pd.DataFrame, calendar: pd.Datet
     column_indices = table['code'].map(code_index).to_numpy(dtype=int)
     close_grid[row_indices, column_indices] = np.where(
         np.isfinite(adjusted_close) & (adjusted_close > 0), adjusted_close, np.nan)
+    open_grid = None
+    if include_long_short:
+        open_grid = np.full_like(close_grid, np.nan)
+        open_grid[row_indices, column_indices] = table['_adj_open'].to_numpy(dtype=float)
     openings = {}
     for date, part in table.loc[table['date'].isin(opening_dates)].groupby('date', sort=False):
         records = part.drop(columns='date').set_index('code').to_dict('index')
@@ -277,39 +373,100 @@ def run_backtest(prices: pd.DataFrame, signals: pd.DataFrame, calendar: pd.Datet
             complete = execution_date is not None and start <= execution_date <= end and exit_date is not None
             future_return = (exit_price / entry_price - 1.0) if complete and _positive(entry_price) and _positive(exit_price) else np.nan
             forward_records.append((signal_date, code, future_return))
-    positions = np.zeros((len(PORTFOLIOS), len(codes)))
-    cash = np.ones(len(PORTFOLIOS))
+    positions = np.zeros((len(portfolios), len(codes)))
+    cash = np.ones(len(portfolios))
     min_cash = cash.copy()
     last_marks = np.full(len(codes), np.nan)
-    nav_values = np.empty((len(sessions), len(PORTFOLIOS)))
-    trades = []
+    nav_values = np.empty((len(sessions), len(portfolios)))
+    stale_counts = np.zeros_like(positions, dtype=int)
+    trades, rebalances = [], []
     for day_index, date in enumerate(sessions):
+        if include_long_short:
+            opening_marks = np.where(np.isfinite(open_grid[day_index]), open_grid[day_index], last_marks)
+            opening_marks = np.nan_to_num(opening_marks, nan=0.0)
+            opening_equity = cash[len(PORTFOLIOS):] + positions[len(PORTFOLIOS):] @ opening_marks
+            if not np.isfinite(opening_equity).all() or (opening_equity <= 0).any():
+                raise ArithmeticError(f'Long-short opening equity must be positive and finite at {date}.')
         if date in schedule:
             rows = openings.get(date, {})
-            opening_marks = last_marks.copy()
-            for code, row in rows.items():
-                if _positive(row['_adj_open']):
-                    opening_marks[code_index[code]] = row['_adj_open']
-            opening_marks = np.nan_to_num(opening_marks, nan=0.0)
+            if not include_long_short:
+                opening_marks = last_marks.copy()
+                for code, row in rows.items():
+                    if _positive(row['_adj_open']):
+                        opening_marks[code_index[code]] = row['_adj_open']
+                opening_marks = np.nan_to_num(opening_marks, nan=0.0)
             for portfolio_index, portfolio in enumerate(PORTFOLIOS):
                 cash[portfolio_index] = _rebalance(
                     positions[portfolio_index], cash[portfolio_index], schedule[date][portfolio_index],
-                    opening_marks, rows, codes, date, portfolio, cost_bps, trades)
+                    opening_marks, rows, codes, date, portfolio, cost_bps, trades, rebalances)
+            for portfolio_index in range(len(PORTFOLIOS), len(portfolios)):
+                cash[portfolio_index] = _rebalance_long_short(
+                    positions[portfolio_index], cash[portfolio_index], schedule[date][4], schedule[date][0],
+                    opening_marks, rows, codes, date, portfolios[portfolio_index],
+                    portfolio_costs[portfolio_index], trades, rebalances)
             min_cash = np.minimum(min_cash, cash)
         current_marks = close_grid[day_index]
         present = np.isfinite(current_marks)
         last_marks[present] = current_marks[present]
-        if ((positions > _EPS) & ~np.isfinite(last_marks)).any():
+        held = np.abs(positions) > _EPS
+        if (held & ~np.isfinite(last_marks)).any():
             raise ArithmeticError('A held position has no known valuation price.')
+        stale_counts += held & ~present
         nav_values[day_index] = cash + positions @ np.nan_to_num(last_marks, nan=0.0)
-    nav = pd.DataFrame(nav_values, index=sessions.rename('date'), columns=PORTFOLIOS)
+        if include_long_short:
+            closing_equity = nav_values[day_index, len(PORTFOLIOS):]
+            if not np.isfinite(closing_equity).all() or (closing_equity <= 0).any():
+                raise ArithmeticError(f'Long-short closing equity must be positive and finite at {date}.')
+    nav = pd.DataFrame(nav_values, index=sessions.rename('date'), columns=portfolios)
     nav.attrs['initial_nav'] = 1.0
-    nav.attrs['ending_cash'] = dict(zip(PORTFOLIOS, cash.tolist()))
-    nav.attrs['min_cash'] = dict(zip(PORTFOLIOS, min_cash.tolist()))
+    nav.attrs['ending_cash'] = dict(zip(portfolios, cash.tolist()))
+    nav.attrs['min_cash'] = dict(zip(portfolios, min_cash.tolist()))
     nav.attrs['cost_bps'] = float(cost_bps)
+    nav.attrs['portfolio_cost_bps'] = dict(zip(portfolios, portfolio_costs))
+    nav.attrs['ending_positions'] = {
+        portfolio: {codes[index]: float(positions[p, index])
+                    for index in np.flatnonzero(np.abs(positions[p]) > _EPS)}
+        for p, portfolio in enumerate(portfolios)}
+    nav.attrs['rebalances'] = rebalances
+    nav.attrs['stale_valuations'] = [
+        (portfolio, codes[index], int(stale_counts[p, index]))
+        for p, portfolio in enumerate(portfolios)
+        for index in np.flatnonzero(stale_counts[p])]
     trade_frame = pd.DataFrame(trades, columns=TRADE_COLUMNS)
     forward = pd.DataFrame(forward_records, columns=FORWARD_COLUMNS).sort_values(['date', 'code']).reset_index(drop=True)
     return nav, trade_frame, forward
+
+
+def rebalance_summary(nav: pd.DataFrame) -> pd.DataFrame:
+    """Export the rebalance ledger from an unmodified run_backtest NAV result.
+
+    turnover = (actual buys + actual sells) / pre-trade opening NAV;
+    one_way_turnover = turnover / 2. Initial establishment, zero-trade months
+    and blocked attempts are retained; blocked notional contributes zero.
+    This is per-rebalance turnover, not an annualized value. Export this table
+    before saving NAV to CSV, because CSV does not retain DataFrame attrs.
+    """
+    if 'rebalances' not in nav.attrs:
+        raise ValueError('Rebalance ledger is missing; use the original run_backtest NAV result.')
+    result = pd.DataFrame(nav.attrs['rebalances'], columns=REBALANCE_COLUMNS)
+    if not result.empty:
+        if not result['date'].isin(nav.index).all() or not result['portfolio'].isin(nav.columns).all():
+            raise ValueError('Rebalance ledger does not match the supplied NAV dates/portfolios.')
+        if result.duplicated(['date', 'portfolio']).any():
+            raise ValueError('Duplicate date/portfolio in the rebalance ledger.')
+    return result
+
+
+def stale_valuation_summary(nav: pd.DataFrame) -> pd.DataFrame:
+    """Export stock-day counts of nonzero long/short holdings using a prior close.
+
+    A held security with a missing row or invalid adjusted close contributes
+    one day. Counts describe valuation carry-forward, not verified delistings.
+    Use the original NAV result; attrs do not survive CSV serialization.
+    """
+    if 'stale_valuations' not in nav.attrs:
+        raise ValueError('Stale valuation counts are missing; use the original run_backtest NAV result.')
+    return pd.DataFrame(nav.attrs['stale_valuations'], columns=STALE_COLUMNS)
 
 
 def performance_summary(nav: pd.DataFrame) -> pd.DataFrame:
