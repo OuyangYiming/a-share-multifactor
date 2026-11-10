@@ -1,4 +1,4 @@
-name: Research and data checks
+name: Five MVP checks
 on: [push, pull_request]
 permissions:
   contents: read
