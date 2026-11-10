@@ -1,4 +1,4 @@
-name: Data pipeline tests
+name: Five MVP checks
 on: [push, pull_request]
 permissions:
   contents: read

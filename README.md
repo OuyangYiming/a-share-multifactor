@@ -1,73 +1,66 @@
-# A 股多因子研究与回测
+# A 股多因子月度研究 MVP
 
-仓库：[OuyangYiming/a-share-multifactor](https://github.com/OuyangYiming/a-share-multifactor)（私有）.
+使用 BaoStock 历史沪深 300 与中证 500 成员并集，完成四因子、月度 RankIC、五组含成本回测和一张净值图. 回测区间为 2018—2025 年，2018 年 1 月首次建仓使用 2017 年 12 月末信号. 收益、有效样本和 IC 结果以本次运行生成的 CSV 为准.
 
-本项目按任务书分阶段实现，由本人学习和验收，Codex 协助编码与测试. 当前实现单股示例、五股行情试点、交易日历与基准、五股上市日期以及保留未知状态的样本筛选. 尚无因子有效性、策略收益或样本外研究结论.
+## 运行
 
-## 环境与运行
-
-锁定依赖在 Windows、Python 3.12 上验证. 任务书允许 Python 3.10 及以上，但本锁定环境不保证支持 3.10，复现请使用 Python 3.12. 首次下载需要联网，后续可使用本地缓存.
-
-取得仓库后在项目根目录运行. 克隆私有仓库需要 GitHub 账号具备访问权限，并在使用 Git 的电脑上完成认证；应用中的 GitHub 连接与本机 Git 凭据分别管理. Windows PowerShell：
+在现有 Windows 环境运行：
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe run_all.py
-.\.venv\Scripts\python.exe -m pytest -q
+Set-Location 'D:\Codex\2026-11-09\fen\outputs\a-share-multifactor'
+& 'D:\Codex\2026-11-09\fen\work\.venv\Scripts\python.exe' run_all.py
 ```
 
-macOS / Linux：
+首次运行需要联网下载 BaoStock 数据；已保存的 CSV 缓存会复用，下载中断后可重新执行同一命令. 缓存完整后可离线重算：
 
-```bash
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python run_all.py
-.venv/bin/python -m pytest -q
+```powershell
+& 'D:\Codex\2026-11-09\fen\work\.venv\Scripts\python.exe' run_all.py --offline
 ```
 
-非 Windows 平台尚未实测. 安装依赖后，一条 `python run_all.py` 命令复现**已实现的行情、参考数据与五股筛选审计**，不是整个研究项目. 有全部缓存时可运行 `python run_all.py --offline`，确认不连接数据服务. 单独执行用 `--stage stage0`、`--stage stage1-pilot`、`--stage reference` 或 `--stage sample-audit`.
+离线模式缺少所需缓存时会报错. 迁移环境时使用 Python 3.12，按 `requirements.txt` 安装依赖后，在项目根目录运行 `python run_all.py`.
 
-## 示例数据和输出
+## 方法
 
-- 来源：AKShare 的腾讯日线接口 `stock_zh_a_hist_tx`，证券代码 `sh600000`，请求区间为 2015-01-01 至 2025-12-31，`adjust="hfq"`（后复权）.
-- 保存字段：交易日、证券代码、后复权收盘价、内部复权标记. 代码统一为 `sh.600000`，内部标记 `1` 表示本次请求后复权；二者由请求参数补充，不能视为对上游返回值的独立核验.
-- 原始数据存入 `data/raw/`，该目录被 `.gitignore` 排除. 此示例只包含指定股票，并未完成全市场选样、ST / 停牌 / 新股剔除.
-- 成功运行后生成 `results/figures/example_close.png`、`results/tables/example_summary.csv`、`results/tables/example_year_counts.csv` 与 `results/provenance.json`.
-- `config/example_snapshot.json` 保存首次有效快照的请求参数及 SHA256. 后续缓存或重新下载数据若不匹配，会报错并停止，不会默默改变参考结果. 数据服务如修订历史，需要保留旧快照并单独审查，不能保证远端永不变化.
-- 后复权价用于价格序列分析，不是历史上可以实际成交的报价. 此图也不是投资组合净值图.
+**数据与股票池.** 下载 2016-12-01 至 2025-12-31 的交易日历、未复权日线和复权因子，前段数据用于因子回看. 每个信号月末查询当时的沪深 300 与中证 500 成员，合并去重，并拒绝日期晚于信号日的成员快照. 信号日期为 2017 年 12 月至 2025 年 11 月的最后一个交易日. 合格股票须在当期成员并集中、月末非 ST、交易状态正常，且四个因子均为有限值.
 
-## 目录
+**四因子与综合分数.** 记 `P[t]` 为后复权收盘价，`r[t] = P[t] / P[t-1] - 1`，下标按交易日计. 因子窗口不前填缺失数据.
 
-```text
-config/       示例快照参数与校验值
-data/         本地行情缓存，不提交 Git
-docs/         阶段讲解、验收记录、后续任务与数据限制
-notebooks/    交互练习目录，当前尚无 notebook
-report/       最终 LaTeX 报告目录，尚未编写正式研究报告
-results/      已实际运行的表、图、来源和验证记录
-src/          行情、参考数据、资格筛选与整合审计模块
-tests/        使用明确标注的构造数据检验程序边界
-requirements.txt
-run_all.py
-```
+| 因子 | 月末计算口径 |
+|---|---|
+| 动量 `momentum` | `P[t-21] / P[t-252] - 1`，跳过最近 21 个交易日 |
+| 反转 `reversal` | `-(P[t] / P[t-21] - 1)` |
+| 低波动 `low_volatility` | 最近 60 个交易日日收益率的样本标准差取负 |
+| 换手率 `turnover` | 最近 20 个交易日日换手率的均值取负 |
 
-## 学习与验收
+四因子均按数值越大越有利定向. 在同一合格股票池内分别计算截面百分位排名，同值取平均名次，四个排名等权平均得到 `score`.
 
-先阅读 `docs/stage0_walkthrough.md`，再按 `docs/acceptance.md` 记录运行与口头解释. 自动测试通过不能代替本人能讲清楚代码. 行情、参考数据和筛选规则分别见 `docs/stage1_data.md`、`docs/reference_data.md`、`docs/eligibility.md`.
+**五组回测.** 月末收盘生成信号，下一个交易日开盘调仓. 按 `score` 从低到高分成数量尽量相等的 Q1—Q5，同分按证券代码排序，组内等权. `benchmark` 是同一合格股票池的等权组合，采用相同调仓、成交约束和成本；它不是指数公布净值.
 
-试点固定浦发银行、平安银行、贵州茅台、万科 A、宁德时代，分别获取不复权与后复权数据，核对日期集合并保留两种价格. 每股逐年覆盖、字段缺失及阶段未完成项保存在 `results/tables/stage1_*` 和 `results/stage1_audit.json`. 这些是指定样本的下载记录，不是随机抽查、外部行情核对或完整交易日覆盖证明. 未取得的历史状态保持未知，未输出虚构的全市场剔除数量.
+各组合从现金净值 1 开始，买入和卖出均按实际成交额收取 15 bps（各 0.15%）成本. 用未复权开盘价和昨收判断涨跌停：开盘涨停不买、跌停不卖，停牌、无成交量或关键状态及价格缺失时不交易. 先卖后买，受阻卖出头寸保留至后续月度调仓，现金不足时同比例缩减可买订单. 以复权价格记账，每个交易日收盘估值. 收益指标按一年 252 个交易日计算，Sharpe 使用零无风险利率，最大回撤包含初始净值.
 
-交易日历、沪深 300 和中证 500、五股上市日期已接入，见 `results/reference_audit.json`. 筛选规则只把已知 ST、停牌或上市不足 60 个交易日的记录归入相应排除项；历史状态缺失归为未知，不能当作合格样本. 五股实际结果为 59 条已知新股排除、12,307 条未知，出处为 `results/pilot_eligibility_audit.json` 和 `results/tables/pilot_sample_summary.csv`. “已证实合格为零”表示证据不足，不表示市场上没有可交易股票.
+**RankIC.** 对四因子及 `score` 分别计算与下期收益的截面 Spearman 相关系数，同值取平均名次. 下期收益使用信号后首个交易日开盘至再下个月首个交易日开盘的复权价格，不计成本或成交限制. 不完整的收益窗口保留缺失值；汇总只使用有效月份，ICIR 为月度 RankIC 均值除以样本标准差，不年化. 2025 年 11 月末信号对应的收益窗口缺少 2026 年 1 月开盘价，该期 IC 留空，2025 年 12 月仍计入净值.
 
-项目总体进度以 `results/stage1_progress.json` 为准；`stage1_audit.json` 和 `stage1_field_coverage.csv` 仅描述行情接口本身提供的字段. 最新全套测试结果见 `results/current_test_summary.json`. 免费历史数据源的实测发现与拒绝使用的接口见 `docs/history_sources.md`，不把这些探测数据混入正式样本.
+## 输出
 
-## 当前局限
+成功运行后查看以下文件；程序结束时也会打印回测、IC 和执行汇总.
 
-1. 尚未完成全市场覆盖、历史退市股票和时点行业分类验收，不能排除幸存者偏差与分类泄漏.
-2. 尚无信号、交易或回测模块；当前测试不构成无未来函数证明.
-3. 数据下载依赖外部服务及其网络可达性. 本地缓存可固定输入，重新下载不保证服务方历史数据不变.
-4. 待核查每日总市值、估值的时点口径、涨跌停可成交约束及北交所覆盖. 详见 `docs/data_source_review.md`.
-5. 尚未由另一位同学从零复现；未进行简历成果描述或网站发布.
+| 路径 | 内容 |
+|---|---|
+| `results/figures/mvp_nav.png` | Q1—Q5 与等权基准的一张净值图 |
+| `results/tables/mvp_performance.csv` | 总收益、年化收益、年化波动率、Sharpe、最大回撤 |
+| `results/tables/mvp_nav.csv` | 扣除交易成本后的每日净值 |
+| `results/tables/mvp_rank_ic.csv` | 各信号月、各因子的 RankIC 与有效配对数 `n` |
+| `results/tables/mvp_ic_summary.csv` | IC 均值、标准差、ICIR、正值比例和有效月数 `months` |
+| `results/tables/mvp_sample_summary.csv` | 每月成员并集数量、合格数量和排除数量 |
+| `results/tables/mvp_trades.csv` | 成交金额、费用及订单受阻原因 |
+| `results/tables/mvp_execution_summary.csv` | 各组合成交与受阻次数、成交额及总成本 |
+| `data/mvp/signals.csv` | 月末四因子和综合分数 |
+| `data/mvp/forward_returns.csv` | 用于 IC 的下期收益标签 |
 
-官方接口：[AKShare 文档](https://akshare.akfamily.xyz/data/stock/stock.html)，[腾讯日线实现](https://github.com/akfamily/akshare/blob/main/akshare/stock/quote/stock_hist_tx.py). BaoStock 在本机连接测试中超时，未用于本次行情输出.
+原始日线、复权因子、成员快照和整理后的日线缓存位于 `data/mvp/`；合并成员名单为 `data/mvp/constituents.csv`. 当前入口为 `run_all.py`，依次调用 `src/data.py`、`src/factors.py`、`src/backtest.py` 和 `src/evaluate.py`.
+
+## 局限
+
+1. **供应商历史成员与访问规则.** 历史成员来自供应商周快照，代码映射和临时成员缺额会影响股票池，尚未逐次对照官方调样公告. 中证 500 在 2021-09-30 实际返回 499 只，按返回名单使用，不人为补足. [官方访问规则](https://www.baostock.com/blacklist)要求每日 API 请求不超过 5 万次且禁止并发连接，下载采用单连接分块缓存.
+2. **日线成交与成本简化.** 开盘价成交、涨跌停判断及每边 15 bps 是日线层面的近似，未模拟盘口排队、冲击、容量、整手数量和逐笔费用；复权价格记账也不是实际现金分红账户.
+3. **验证与退市估值.** 未做样本外优化验证，结果不能说明策略具有稳定预测能力. 持仓缺少后续行情时沿用最近有效收盘价，包括退市后无法处置的头寸，尚未建模退市结算，可能高估净值.
