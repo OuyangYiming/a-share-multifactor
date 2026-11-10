@@ -19,8 +19,8 @@ from PIL import Image
 
 PORTFOLIOS = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'benchmark']
 FACTORS = ['momentum', 'reversal', 'low_volatility', 'turnover', 'score']
-NAMES = {'benchmark': '等权基准', 'momentum': '动量', 'reversal': '反转',
-         'low_volatility': '低波动', 'turnover': '换手率', 'score': '综合分数',
+NAMES = {'benchmark': '等权基准', 'momentum': '动量', 'reversal': '反转（取负的近一月收益）',
+         'low_volatility': '低波动（取负的波动率）', 'turnover': '低换手（取负的平均换手率）', 'score': '综合分数',
          'long_short': '多空扣费后', 'long_short_gross': '多空零费用'}
 REQUIRED = {
     'nav': ['date'] + PORTFOLIOS,
@@ -390,7 +390,7 @@ def render_tex(data):
 \date{}
 \begin{document}
 \begin{abstract}
-本文以 BaoStock 历史沪深 300 与中证 500 成员并集构造月度股票池，使用动量、反转、低波动和换手率四个信号，按等权截面排名形成综合分数. 回测覆盖 @@START@@ 至 @@END@@，共 @@DAYS@@ 个交易日、@@MONTHS@@ 次月度调仓. 本次正式结果中，Q5 总收益为 @@Q5_RETURN@@，相同交易约束与成本下的等权基准为 @@BENCH_RETURN@@；综合分数平均 RankIC 为 @@SCORE_IC@@. 本报告给出数据范围、信号时点、成交规则和结果口径，数值由项目结果文件生成.
+本文以 BaoStock 历史沪深 300 与中证 500 成员并集构造月度股票池，使用动量、反转、低波动和低换手四个信号，按等权截面排名形成综合分数. 回测覆盖 @@START@@ 至 @@END@@，共 @@DAYS@@ 个交易日、@@MONTHS@@ 次月度调仓. 本次正式结果中，Q5 总收益为 @@Q5_RETURN@@，相同交易约束与成本下的等权基准为 @@BENCH_RETURN@@；综合分数平均 RankIC 为 @@SCORE_IC@@. 本报告给出数据范围、信号时点、成交规则和结果口径，数值由项目结果文件生成.
 Q5 年化收益比同池等权基准高约 @@Q5_CAGR_DIFF@@ 个百分点，但 Q5 相对基准的月度超额均值接近零（t{\fontspec{Latin Modern Math}≈}@@MONTHLY_T_APPROX@@），不足以支持稳定超额；信号主要来自低波动与低换手，二者高度相关（平均秩相关 @@LOW_FACTOR_CORR@@）；单边成本升至 30 bps 后优势消失. 本研究为价量四因子的最小版本，未做去极值、行业与市值中性化和样本外验证，股票池为沪深300+中证500（中证800口径），不是全 A 股.
 \end{abstract}
 \maketitle
