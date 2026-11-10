@@ -16,3 +16,4 @@ report/*.out
 docs/HANDOFF.md
 results/robustness/README_before.md
 results/robustness/original_files_sha256.csv
+results/tables/mvp_trades.csv
