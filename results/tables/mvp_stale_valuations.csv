@@ -1,0 +1,17 @@
+portfolio,code,stale_days
+Q1,sz.002505,323
+Q2,sz.000540,609
+Q3,sh.601989,78
+Q3,sz.000418,1586
+Q3,sz.300114,217
+Q4,sh.600270,1699
+Q5,sh.600837,205
+benchmark,sh.600270,1699
+benchmark,sh.600837,205
+benchmark,sh.601989,78
+benchmark,sz.000418,1586
+benchmark,sz.000540,609
+benchmark,sz.002505,323
+benchmark,sz.300114,217
+long_short,sh.600837,205
+long_short_gross,sh.600837,205

@@ -2,6 +2,25 @@
 
 使用 BaoStock 历史沪深 300 与中证 500 成员并集，完成四因子、月度 RankIC、五组含成本回测和一张净值图. 回测区间为 2018—2025 年，2018 年 1 月首次建仓使用 2017 年 12 月末信号. 收益、有效样本和 IC 结果以本次运行生成的 CSV 为准.
 
+## 本次结果
+
+已完成 2018-01-02 至 2025-12-31 的 1942 个交易日、96 个信号月，形成 75157 个合格股票月. 各月合格股票数为 716—800. 依据：[日净值](results/tables/mvp_nav.csv)、[样本汇总](results/tables/mvp_sample_summary.csv).
+
+| 组合 | 年化收益 | 年化波动 | Sharpe | 最大回撤 | 年化单边换手/倍 |
+|---|---:|---:|---:|---:|---:|
+| Q1 | -4.48% | 27.05% | -0.034 | -63.74% | 6.25 |
+| Q2 | 1.71% | 23.16% | 0.189 | -48.95% | 8.40 |
+| Q3 | 3.21% | 20.71% | 0.256 | -36.52% | 8.71 |
+| Q4 | 7.01% | 18.57% | 0.458 | -34.30% | 8.25 |
+| Q5 | 5.34% | 16.41% | 0.399 | -30.28% | 5.50 |
+| 等权基准 | 4.64% | 20.52% | 0.324 | -35.03% | 0.62 |
+| 多空扣费后 | 2.33% | 19.62% | 0.216 | -42.86% | 12.19 |
+| 多空零费用 | 6.29% | 19.46% | 0.411 | -40.23% | 12.17 |
+
+数值来自 [绩效表](results/tables/mvp_performance.csv) 和 [多空对比](results/tables/mvp_long_short_comparison.csv). Q5 年化收益比等权基准高 0.70 个百分点，但 Q4 高于 Q5，分层收益并非严格单调. 两个独立多空账户的年化收益相差约 3.95 个百分点，显示本设定下交易成本影响较大.
+
+综合分数的平均 RankIC 为 0.0816，ICIR 为 0.4107，正 IC 月份占 69.47%，有效月份为 95. 四因子及综合分数的完整结果见 [IC 汇总](results/tables/mvp_ic_summary.csv). 净值图见 [mvp_nav.png](results/figures/mvp_nav.png).
+
 ## 运行
 
 在现有 Windows 环境运行：
@@ -22,6 +41,12 @@ Set-Location 'D:\Codex\2026-11-09\fen\outputs\a-share-multifactor'
 在 VS Code 中打开 [教学 Notebook](notebooks/mvp_walkthrough.ipynb)，可逐步查看四因子、十只股票手算 RankIC、调仓时点和成本示例；末尾单元读取已经生成的真实结果，无需再次联网.
 
 正式结果生成后，运行 `python report/build_report.py` 可读取结果表并生成 `report/report.tex` 与 `report/report.pdf`. PDF 编译需要安装 XeLaTeX；仅导出可编辑源码时使用 `python report/build_report.py --tex-only`. 报告程序缺少正式输入时会停止，不使用示例数据填充结果.
+
+下载完成后运行 `python scripts/build_manifest.py`，生成每只股票的起止日期、行数和下载时间清单 `data/mvp/manifest.csv`. 现有缓存没有单独保存 API 完成时间，清单采用文件最后写入时间，并在 `download_time_source` 中明确标为 `daily_file_mtime`. 当前缓存支持中断后复用已有文件，尚不自动追加新增交易日.
+
+完整收尾运行 `python scripts/finalize_delivery.py`：检查结果及数据清单齐备后生成报告，并打包为 `delivery/a-share-multifactor-delivery.zip`. 使用 `--check-only` 只检查已有文件. 本地交付包含源码、Notebook、报告、结果表、派生信号和数据清单，排除原始行情缓存；`delivery/` 与 `data/` 一同排除在 Git 提交之外.
+
+GitHub 随附汇总结果和净值图，不随附约 30 MB 的逐笔成交大表 `results/tables/mvp_trades.csv`；本地项目与交付 ZIP 包含该表. 克隆仓库后如需重新生成完整交付，应先运行数据与回测入口.
 
 ## 方法
 
@@ -69,6 +94,7 @@ Set-Location 'D:\Codex\2026-11-09\fen\outputs\a-share-multifactor'
 | `results/tables/mvp_missing_labels.csv` | 完整窗口与末期窗口的缺失收益标签配对数及证券数 |
 | `data/mvp/signals.csv` | 月末四因子和综合分数 |
 | `data/mvp/forward_returns.csv` | 用于 IC 的下期收益标签 |
+| `data/mvp/manifest.csv` | 每只股票的实际行情日期范围、行数及文件时间来源 |
 
 原始日线、复权因子、成员快照和整理后的日线缓存位于 `data/mvp/`；合并成员名单为 `data/mvp/constituents.csv`. 当前入口为 `run_all.py`，依次调用 `src/data.py`、`src/factors.py`、`src/backtest.py` 和 `src/evaluate.py`.
 
@@ -76,4 +102,4 @@ Set-Location 'D:\Codex\2026-11-09\fen\outputs\a-share-multifactor'
 
 1. **供应商历史成员与访问规则.** 历史成员来自供应商周快照，代码映射和临时成员缺额会影响股票池，尚未逐次对照官方调样公告. 中证 500 在 2021-09-30 实际返回 499 只，按返回名单使用，不人为补足. [官方访问规则](https://www.baostock.com/blacklist)要求每日 API 请求不超过 5 万次且禁止并发连接，下载采用单连接分块缓存.
 2. **日线成交与成本简化.** 开盘价成交、涨跌停判断及每边 15 bps 是日线层面的近似，未模拟盘口排队、冲击、容量、整手数量、特殊交易日无涨跌停情形和逐笔费用；复权价格记账也不是实际现金分红账户. 多空账户假定可无限借券，不计借券费、融资利息及保证金追缴，用于研究组合对比.
-3. **验证与缺失样本.** 未做样本外优化验证，结果不能说明策略具有稳定预测能力. 持仓缺少后续行情时沿用最近有效收盘价，包括退市后无法处置的头寸，尚未建模退市结算，可能高估净值. 缺失入口或出口开盘价的股票不参与当期 RankIC 配对，可能造成选择偏差；具体受影响数量写入对应结果表.
+3. **验证与缺失样本.** 未做样本外优化验证，结果不能说明策略具有稳定预测能力. 持仓缺少后续行情时沿用最近有效收盘价，尚未建模代码变更、合并换股或退市结算，可能扭曲净值. 本次等权基准涉及 7 只证券、4717 个股票日的前值续估，见 [缺价持仓表](results/tables/mvp_stale_valuations.csv). 缺失入口或出口开盘价的股票不参与当期 RankIC 配对：完整窗口缺少 2 个配对，末期未完成窗口另有 796 个，见 [缺失标签表](results/tables/mvp_missing_labels.csv).

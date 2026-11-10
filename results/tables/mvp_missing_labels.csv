@@ -1,0 +1,4 @@
+scope,pairs,valid_pairs,missing_pairs,missing_stocks
+all,75157,74359,798,798
+complete_windows,74361,74359,2,2
+terminal_window,796,0,796,796

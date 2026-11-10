@@ -141,6 +141,23 @@ def nav_plot(nav):
                               r'\par\small 图 1. 月度分层组合与等权基准的扣费净值.', r'\end{center}'])
 
 
+def quintile_interpretation(performance):
+    annual = performance.loc[PORTFOLIOS[:5], 'cagr']
+    if not np.isfinite(annual).all():
+        raise ValueError('分层年化收益必须是有限值，才能判断单调性.')
+    differences = np.diff(annual.to_numpy())
+    if (differences > 0).all():
+        relation = '随得分严格递增'
+    elif (differences < 0).all():
+        relation = '随得分严格递减'
+    else:
+        relation = '未呈严格单调关系'
+    leaders = '、'.join(annual.index[annual.eq(annual.max())])
+    return ('Q1 至 Q5 的年化收益' + relation + '. 最高年化组为 ' + escape(leaders)
+            + '（' + percent(annual.max()) + '），Q5 为 ' + percent(annual['Q5'])
+            + '，等权基准为 ' + percent(performance.at['benchmark', 'cagr']) + '.')
+
+
 def optional_comparisons(data):
     """Render the agreed optional schemas without guessing exposure conventions."""
     sections = []
@@ -167,13 +184,25 @@ def optional_comparisons(data):
         rows = [[NAMES.get(row.portfolio, escape(row.portfolio)), number(row.cost_bps, 2),
                  percent(row.total_return), percent(row.cagr), number(row.sharpe), percent(row.max_drawdown)]
                 for row in frame.itertuples(index=False)]
+        accounts = frame.set_index('portfolio')
+        if accounts.index.has_duplicates or not {'long_short', 'long_short_gross'}.issubset(accounts.index):
+            raise ValueError('多空对照须包含唯一的扣费后和零费用账户.')
+        net, gross = accounts.at['long_short', 'cagr'], accounts.at['long_short_gross', 'cagr']
+        if not np.isfinite([net, gross]).all():
+            raise ValueError('多空年化收益必须是有限值，才能比较成本影响.')
+        difference = gross - net
+        cost_effect = ('两者年化收益相同' if difference == 0 else
+                       '扣费后比零费用' + ('低 ' if difference > 0 else '高 ')
+                       + number(abs(difference) * 100, 2) + ' 个百分点')
         sections.append(r'\paragraph{多空扣费对照.} 每次月度调仓的目标多头敞口为净值的 '
                         + percent(frame['target_long_exposure'].iloc[0]) + '，目标空头敞口为 '
                         + percent(frame['target_short_exposure'].iloc[0])
                         + '. 多头对应 Q5，空头对应 Q1；多头证券数量为正，空头为负，月内按实际持仓估值. '
                         '扣费后与零费用账户分别逐日记账，'
                         '表内零费用结果来自独立运行，并非在扣费后净值上机械加回累计费用.'
-                        + tabular(['组合', '费率/bps', '总收益', '年化收益', 'Sharpe', '最大回撤'], rows))
+                        + tabular(['组合', '费率/bps', '总收益', '年化收益', 'Sharpe', '最大回撤'], rows)
+                        + '零费用多空账户年化收益为 ' + percent(gross) + '，扣费后为 ' + percent(net)
+                        + '；' + cost_effect + '. 该差异体现本成交及持仓设定下费用对复利路径的影响.')
     return '\n'.join(sections)
 
 
@@ -246,6 +275,7 @@ def render_tex(data):
         '@@ANNUAL@@': tabular(['年份', 'Q1', 'Q5', '等权基准', '收益差/百分点'], annual_rows),
         '@@FIGURE@@': nav_plot(nav), '@@OPTIONAL@@': optional_comparisons(data),
         '@@COVERAGE@@': observed_coverage(data),
+        '@@QUINTILE_INTERPRETATION@@': quintile_interpretation(performance),
     }
     source = r'''% !TEX program = xelatex
 % Generated from completed MVP CSV files by build_report.py.
@@ -319,7 +349,7 @@ def render_tex(data):
 \paragraph{指标口径.} 总收益从初始净值 1 计算，年化收益率按实际观察交易日数和每年 252 日换算. 年化波动率为日收益率样本标准差乘以 $\sqrt{252}$，Sharpe 使用零无风险利率. 最大回撤包含初始现金净值及首个交易日的收益和费用. 下表中收益、波动及回撤均为百分数，Sharpe 无量纲.
 
 \section{回测结果与因子检验}
-\paragraph{累计与年化表现.} 结果表逐项读取本次运行的绩效文件. Q5 的年化收益为 @@Q5_CAGR@@，最大回撤为 @@Q5_DD@@. 判断综合分数是否形成有序分层，应同时观察 Q1 至 Q5 的收益、风险和净值过程，而不只比较单一终值.
+\paragraph{累计与年化表现.} 结果表逐项读取本次运行的绩效文件. @@QUINTILE_INTERPRETATION@@ Q5 的最大回撤为 @@Q5_DD@@.
 @@PERFORMANCE@@
 @@FIGURE@@
 图 1 按同一日度净值 CSV 绘制黑白矢量曲线；横轴依实际交易日顺序展开. 对应的项目原始图为 \href{../results/figures/mvp_nav.png}{\texttt{mvp\_nav.png}}. 六条曲线均已扣除上述成交费用. 图中等权基准同样受调仓成交条件约束，不以理想化指数代替实际执行.
