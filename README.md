@@ -131,6 +131,8 @@ GitHub 随附汇总结果和净值图，不随附约 30 MB 的逐笔成交大表
 
 原始日线、复权因子、成员快照和整理后的日线缓存位于 `data/mvp/`；合并成员名单为 `data/mvp/constituents.csv`. 当前入口为 `run_all.py`，依次调用 `src/data.py`、`src/factors.py`、`src/backtest.py` 和 `src/evaluate.py`.
 
+阅读代码时，先看 `run_all.py` 的调用顺序，再读上述四个核心模块. 前期试点模块已移出当前源码目录，历史实现仍保留在 Git 提交历史中；`__pycache__/` 和 `.pyc` 是 Python 自动生成的缓存，不需要阅读或上传.
+
 <a id="局限"></a>
 
 ## 结果与局限
