@@ -117,6 +117,12 @@ def read_inputs(root):
         path = tables / f'mvp_{stem}.csv'
         if path.exists():
             data[stem] = pd.read_csv(path)
+    robustness = root / 'results' / 'robustness'
+    stems = ('cost_sensitivity', 'period_performance', 'missing_price_inventory',
+             'missing_price_excess_comparison', 'monthly_excess_summary',
+             'factor_rank_correlation')
+    data['robustness'] = {stem: pd.read_csv(robustness / f'{stem}.csv') for stem in stems}
+    data['early_ending_count'] = int(data['robustness']['missing_price_inventory']['ended_early'].sum())
     return data
 
 
@@ -166,13 +172,46 @@ def optional_comparisons(data):
         required = {'portfolio', 'cagr_difference', 'relative_wealth_return', 'tracking_error', 'information_ratio'}
         if not required.issubset(frame):
             raise ValueError('基准比较文件不符合已约定列定义.')
+        nav = data['nav']
+        returns = nav.pct_change(fill_method=None)
+        returns.iloc[0] = nav.iloc[0] - 1.0
+        for row in frame.itertuples(index=False):
+            active = returns[row.portfolio] - returns['benchmark']
+            tracking_error = active.std(ddof=1) * np.sqrt(252)
+            expected = [data['performance'].at[row.portfolio, 'cagr']
+                        - data['performance'].at['benchmark', 'cagr'],
+                        nav[row.portfolio].iloc[-1] / nav['benchmark'].iloc[-1] - 1,
+                        tracking_error, active.mean() * 252 / tracking_error]
+            observed = [row.cagr_difference, row.relative_wealth_return,
+                        row.tracking_error, row.information_ratio]
+            if not np.allclose(expected, observed, atol=1e-9, rtol=0):
+                raise ValueError('基准比较列与净值、绩效文件不一致，停止生成报告.')
         rows = [[escape(row.portfolio), number(row.cagr_difference * 100, 2), percent(row.relative_wealth_return),
                  percent(row.tracking_error), number(row.information_ratio)]
                 for row in frame.itertuples(index=False)]
+        q5 = frame.set_index('portfolio').loc['Q5']
         sections.append(r'\paragraph{相对等权基准.} 年化差为组合与等权基准的年化收益率之差，'
                         '相对财富收益为终值之比减一. 跟踪误差为日收益率差的样本标准差乘以 '
                         r'$\sqrt{252}$；信息比率为日收益率差的均值乘以 252 后除以跟踪误差.'
-                        + tabular(['组合', '年化差/百分点', '相对财富收益', '跟踪误差', '信息比率'], rows))
+                        + tabular(['组合', '年化差/百分点', '相对财富收益', '跟踪误差', '信息比率'], rows)
+                        + r'''\begingroup\small
+\noindent 表注：组合列标识分层账户，$p$ 为该组合，$b$ 为同池等权基准.
+令 $V_{p,0}=V_{b,0}=1$，$N$ 为实际观察交易日数，
+$r_{p,t}=V_{p,t}/V_{p,t-1}-1$，$d_t=r_{p,t}-r_{b,t}$，
+$\bar d=N^{-1}\sum_{t=1}^{N}d_t$，$s_d$ 为 $d_t$ 的样本标准差（分母 $N-1$）.
+首日收益包含从现金建仓的收益和费用. 各列定义如下：
+\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}
+\item 年化差为 $100(g_p-g_b)$ 个百分点，其中 $g_j=(V_{j,N}/V_{j,0})^{252/N}-1$.
+Q5 为 ''' + number(q5.cagr_difference * 100, 2) + r''' 个百分点.
+\item 相对财富收益为 $(V_{p,N}/V_{p,0})/(V_{b,N}/V_{b,0})-1$.
+Q5 为 ''' + percent(q5.relative_wealth_return) + r'''，既非年化值，也非两总收益率的算术差.
+\item 跟踪误差为 $\mathrm{TE}=s_d\sqrt{252}$，Q5 为 ''' + percent(q5.tracking_error) + r'''.
+\item 信息比率为 $252\bar d/\mathrm{TE}$，Q5 为 ''' + number(q5.information_ratio) + r'''（无量纲）.
+分子采用日收益差的算术均值年化，不是 CAGR 差，故符号可与年化差不同.
+\end{enumerate}
+\noindent 数值逐项核对 \texttt{mvp\_benchmark\_comparison.csv}、日净值及绩效表.
+\par\endgroup
+''')
     if 'long_short_comparison' in data:
         frame = data['long_short_comparison']
         required = {'portfolio', 'total_return', 'cagr', 'sharpe', 'max_drawdown', 'cost_bps',
@@ -222,6 +261,58 @@ def observed_coverage(data):
         parts.append(f'持仓沿用历史收盘价的累计数量为 {int(frame["stale_days"].sum()):,} 个组合--股票--交易日，'
                      f'涉及 {frame["code"].nunique():,} 只证券. 该计数逐组合累加，未把缺少行情直接解释为退市.')
     return (r'\paragraph{数据覆盖统计.} ' + ' '.join(parts)) if parts else ''
+
+
+def robustness_section(data):
+    """Format the committed sensitivity tables without rerunning research."""
+    saved = data['robustness']
+    costs = saved['cost_sensitivity'].set_index(['cost_bps', 'portfolio'])
+    cost_rows = []
+    for bps in (5, 15, 30):
+        q5, benchmark = [costs.at[(bps, code), 'cagr'] for code in ('Q5', 'benchmark')]
+        cost_rows.append([str(bps), percent(q5), percent(benchmark), number((q5 - benchmark) * 100, 2)])
+    periods = saved['period_performance'].set_index(['period', 'portfolio'])
+    period_rows = [[period.replace('-', '--')]
+                   + [percent(periods.at[(period, code), 'cagr']) for code in ('Q5', 'benchmark')]
+                   for period in ('2018-2021', '2022-2025')]
+    missing = saved['missing_price_excess_comparison'].set_index('version')
+    original = missing.loc['original']
+    excluded = missing.loc['exclude_union']
+    excess = saved['monthly_excess_summary'].iloc[0]
+    correlation = saved['factor_rank_correlation'].set_index('factor').at['low_volatility', 'turnover']
+    return (r'\clearpage\section{稳健性与局限}' + '\n'
+            + '以下结果仅取自已提交的稳健性结果表，保持原四因子、股票池和研究窗口. '
+              '成本网格为敏感性比较，主回测的单边费率仍为 15 bps.'
+            + r'\paragraph{成本敏感性.} 买卖两侧各按所列费率计费，基准也承担相同费率.'
+            + tabular(['单边成本/bps', 'Q5 年化', '基准年化', '年化差/百分点'], cost_rows)
+            + r'\paragraph{分段表现.} 从持续持有净值截取区间，以区间前一交易日净值为起点，'
+              '首次区间从现金 1 起算；年化按 252 个交易日换算，不在分段边界重新建仓. '
+              '该分段是描述统计，不是样本外验证.'
+            + tabular(['区间', 'Q5 年化', '基准年化'], period_rows)
+            + r'\paragraph{缺价敏感性.} 将 ' + str(data['early_ending_count'])
+            + ' 只实际记录提前结束的证券从各组和基准中剔除，保留原分数并重新分组后，'
+              'Q5 相对基准的年化差由 ' + number(original.q5_minus_benchmark_cagr * 100, 2)
+            + ' 降至 ' + number(excluded.q5_minus_benchmark_cagr * 100, 2)
+            + ' 个百分点. 这是含事后信息的敏感性分析，不能作为事前可实施的筛选规则，'
+              '也不能由缺价直接断定退市原因.'
+            + r'\paragraph{月度超额.} 定义为 Q5 月复合收益减去基准月复合收益. '
+            + str(int(excess['months'])) + ' 个月的均值为 ' + percent(excess['mean'], 4)
+            + '，标准误为 ' + percent(excess['standard_error'], 4)
+            + r'，$t=' + number(excess['t_value']) + '$. 标准误为月超额样本标准差除以月份数平方根，'
+              't 值为均值除以标准误；采用月份独立同分布假设，未校正自相关. '
+              '这项结果不支持稳定正月超额的结论.'
+            + r'\paragraph{因子重叠与分层.} 低波动和低换手的平均月度截面秩相关为 '
+            + number(correlation, 3) + '，两者信息存在重叠. 原组合 Q4 年化 '
+            + percent(original.q4_cagr) + ' 高于 Q5 的 ' + percent(original.q5_cagr)
+            + '，五组收益不严格单调.'
+            + r'\paragraph{多空假设.} 多头与空头目标各为权益的 100\%，总敞口 200\%. '
+              '假设无限借券、不含融券费用，结果仅为研究型因子价差，不能视为实际可借券策略.'
+            + r'\par\begingroup\small\emergencystretch=2em '
+              r'\paragraph{数据依据.} 本页来自 \nolinkurl{results/robustness/} 中的 '
+              r'\nolinkurl{cost_sensitivity.csv}、\nolinkurl{period_performance.csv}、'
+              r'\nolinkurl{missing_price_excess_comparison.csv}、'
+              r'\nolinkurl{missing_price_inventory.csv}、'
+              r'\nolinkurl{monthly_excess_summary.csv} 和 \nolinkurl{factor_rank_correlation.csv}.\par\endgroup')
 
 
 def render_tex(data):
@@ -275,6 +366,8 @@ def render_tex(data):
         '@@ANNUAL@@': tabular(['年份', 'Q1', 'Q5', '等权基准', '收益差/百分点'], annual_rows),
         '@@FIGURE@@': nav_plot(nav), '@@OPTIONAL@@': optional_comparisons(data),
         '@@COVERAGE@@': observed_coverage(data),
+        '@@EARLY_ENDING@@': str(data['early_ending_count']),
+        '@@ROBUSTNESS@@': robustness_section(data).replace(r'\paragraph', '\n' + r'\paragraph'),
         '@@QUINTILE_INTERPRETATION@@': quintile_interpretation(performance),
     }
     source = r'''% !TEX program = xelatex
@@ -308,7 +401,7 @@ def render_tex(data):
 \section{研究范围与样本}
 研究对象为按历史信号日期查询的沪深 300 和中证 500 成员并集. 每个信号月分别取得两个指数的历史成员，按证券代码合并去重；当期股票池随着成员调整变化. 研究入口采用月末收盘信号、下一个交易日开盘成交. 2018 年 1 月建仓使用 2017 年 12 月末信号，最后一次建仓使用 2025 年 11 月末信号，净值继续估值至 2025 年最后一个交易日.
 
-交易日历覆盖因子回看与回测区间. 各股票至少保留首次入池信号前 252 个交易日的行情，并延续至研究结束；已经下载的完整历史缓存直接复用. 未复权价格用于成交约束，复权价格用于收益和持仓估值. 复权事件按生效日期向后匹配，不使用晚于当前交易日的事件进行向前填充. 日线中的 \texttt{isST} 与 \texttt{tradestatus} 分别用于识别 ST 和交易状态.
+交易日历覆盖因子回看与回测区间. 下载区间为首次入池信号前 252 个交易日至 2025-12-31，其中 @@EARLY_ENDING@@ 只证券的实际记录提前结束、未补全；已经下载的完整历史缓存直接复用. 未复权价格用于成交约束，复权价格用于收益和持仓估值. 复权事件按生效日期向后匹配，不使用晚于当前交易日的事件进行向前填充. 日线中的 \texttt{isST} 与 \texttt{tradestatus} 分别用于识别 ST 和交易状态.
 
 \paragraph{合格样本.} 股票在信号日须属于历史成员并集，非 ST、交易状态正常，并且四个因子均有有限数值. 缺少日线时在公共交易日网格上保留缺失值，不用前值补齐因子窗口. 本次每月成员数量为 @@MEMBER_MIN@@--@@MEMBER_MAX@@ 只，合格数量为 @@ELIGIBLE_MIN@@--@@ELIGIBLE_MAX@@ 只，平均 @@ELIGIBLE_MEAN@@ 只. 共形成 @@STOCK_MONTHS@@ 个合格股票月，每月平均排除 @@EXCLUDED_MEAN@@ 只. 排除数量汇总记录的是最终合格条件的并集，不按原因重复累计.
 
@@ -380,6 +473,7 @@ RankIC 与组合净值回答不同问题：前者描述下一持有期收益的�
 数据缓存齐备后，在项目根目录运行 \texttt{python run\_all.py --offline} 生成正式结果，再运行 \texttt{python report/build\_report.py} 生成本报告及可编辑源文件. 报告程序读取净值、绩效、样本、IC 与成交 CSV，核对所需文件和关键维度后才写入输出；本次文中所有实证数值均由这些输入格式化或按明确公式计算.
 
 代码入口依次调用 \texttt{src/data.py}、\texttt{src/factors.py}、\texttt{src/backtest.py} 与 \texttt{src/evaluate.py}. 对应的关键检查位于 \texttt{tests/test\_mvp.py}；运行方式为 \texttt{python -m pytest -q}. 报告不把测试框架存在视为测试已通过，具体通过情况以实际终端输出为准. 原始结果文件集中在 \texttt{results/tables/}，图形集中在 \texttt{results/figures/}. 方法的适用边界统一参见 \href{../README.md\#局限}{README 的“局限”一节}.
+@@ROBUSTNESS@@
 \end{document}
 '''
     for key, value in replacements.items():

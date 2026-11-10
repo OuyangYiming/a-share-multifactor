@@ -29,7 +29,7 @@
 \section{研究范围与样本}
 研究对象为按历史信号日期查询的沪深 300 和中证 500 成员并集. 每个信号月分别取得两个指数的历史成员，按证券代码合并去重；当期股票池随着成员调整变化. 研究入口采用月末收盘信号、下一个交易日开盘成交. 2018 年 1 月建仓使用 2017 年 12 月末信号，最后一次建仓使用 2025 年 11 月末信号，净值继续估值至 2025 年最后一个交易日.
 
-交易日历覆盖因子回看与回测区间. 各股票至少保留首次入池信号前 252 个交易日的行情，并延续至研究结束；已经下载的完整历史缓存直接复用. 未复权价格用于成交约束，复权价格用于收益和持仓估值. 复权事件按生效日期向后匹配，不使用晚于当前交易日的事件进行向前填充. 日线中的 \texttt{isST} 与 \texttt{tradestatus} 分别用于识别 ST 和交易状态.
+交易日历覆盖因子回看与回测区间. 下载区间为首次入池信号前 252 个交易日至 2025-12-31，其中 62 只证券的实际记录提前结束、未补全；已经下载的完整历史缓存直接复用. 未复权价格用于成交约束，复权价格用于收益和持仓估值. 复权事件按生效日期向后匹配，不使用晚于当前交易日的事件进行向前填充. 日线中的 \texttt{isST} 与 \texttt{tradestatus} 分别用于识别 ST 和交易状态.
 
 \paragraph{合格样本} 股票在信号日须属于历史成员并集，非 ST、交易状态正常，并且四个因子均有有限数值. 缺少日线时在公共交易日网格上保留缺失值，不用前值补齐因子窗口. 本次每月成员数量为 799--800 只，合格数量为 716--800 只，平均 782.9 只. 共形成 75,157 个合格股票月，每月平均排除 17.1 只. 排除数量汇总记录的是最终合格条件的并集，不按原因重复累计.
 
@@ -184,7 +184,24 @@ Q4 & 2.37 & 18.83\% & 5.17\% & 0.359 \\
 Q5 & 0.70 & 5.31\% & 8.82\% & -0.010 \\
 \bottomrule
 \end{tabular}
-\end{center}
+\end{center}\begingroup\small
+\noindent 表注：组合列标识分层账户，$p$ 为该组合，$b$ 为同池等权基准.
+令 $V_{p,0}=V_{b,0}=1$，$N$ 为实际观察交易日数，
+$r_{p,t}=V_{p,t}/V_{p,t-1}-1$，$d_t=r_{p,t}-r_{b,t}$，
+$\bar d=N^{-1}\sum_{t=1}^{N}d_t$，$s_d$ 为 $d_t$ 的样本标准差（分母 $N-1$）.
+首日收益包含从现金建仓的收益和费用. 各列定义如下：
+\begin{enumerate}\setlength{\itemsep}{0pt}\setlength{\parsep}{0pt}
+\item 年化差为 $100(g_p-g_b)$ 个百分点，其中 $g_j=(V_{j,N}/V_{j,0})^{252/N}-1$.
+Q5 为 0.70 个百分点.
+\item 相对财富收益为 $(V_{p,N}/V_{p,0})/(V_{b,N}/V_{b,0})-1$.
+Q5 为 5.31\%，既非年化值，也非两总收益率的算术差.
+\item 跟踪误差为 $\mathrm{TE}=s_d\sqrt{252}$，Q5 为 8.82\%.
+\item 信息比率为 $252\bar d/\mathrm{TE}$，Q5 为 -0.010（无量纲）.
+分子采用日收益差的算术均值年化，不是 CAGR 差，故符号可与年化差不同.
+\end{enumerate}
+\noindent 数值逐项核对 \texttt{mvp\_benchmark\_comparison.csv}、日净值及绩效表.
+\par\endgroup
+
 \paragraph{多空扣费对照} 每次月度调仓的目标多头敞口为净值的 100.00\%，目标空头敞口为 -100.00\%. 多头对应 Q5，空头对应 Q1；多头证券数量为正，空头为负，月内按实际持仓估值. 扣费后与零费用账户分别逐日记账，表内零费用结果来自独立运行，并非在扣费后净值上机械加回累计费用.\begin{center}\small
 \setlength{\tabcolsep}{5pt}
 \renewcommand{\arraystretch}{1.18}
@@ -210,4 +227,36 @@ Q5 & 0.70 & 5.31\% & 8.82\% & -0.010 \\
 数据缓存齐备后，在项目根目录运行 \texttt{python run\_all.py --offline} 生成正式结果，再运行 \texttt{python report/build\_report.py} 生成本报告及可编辑源文件. 报告程序读取净值、绩效、样本、IC 与成交 CSV，核对所需文件和关键维度后才写入输出；本次文中所有实证数值均由这些输入格式化或按明确公式计算.
 
 代码入口依次调用 \texttt{src/data.py}、\texttt{src/factors.py}、\texttt{src/backtest.py} 与 \texttt{src/evaluate.py}. 对应的关键检查位于 \texttt{tests/test\_mvp.py}；运行方式为 \texttt{python -m pytest -q}. 报告不把测试框架存在视为测试已通过，具体通过情况以实际终端输出为准. 原始结果文件集中在 \texttt{results/tables/}，图形集中在 \texttt{results/figures/}. 方法的适用边界统一参见 \href{../README.md\#局限}{README 的“局限”一节}.
+\clearpage\section{稳健性与局限}
+以下结果仅取自已提交的稳健性结果表，保持原四因子、股票池和研究窗口. 成本网格为敏感性比较，主回测的单边费率仍为 15 bps.
+\paragraph{成本敏感性} 买卖两侧各按所列费率计费，基准也承担相同费率.\begin{center}\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{tabular}{lrrr}
+\toprule
+单边成本/bps & Q5 年化 & 基准年化 & 年化差/百分点 \\
+\midrule
+5 & 6.55\% & 4.77\% & 1.78 \\
+15 & 5.34\% & 4.64\% & 0.70 \\
+30 & 3.55\% & 4.44\% & -0.88 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\paragraph{分段表现} 从持续持有净值截取区间，以区间前一交易日净值为起点，首次区间从现金 1 起算；年化按 252 个交易日换算，不在分段边界重新建仓. 该分段是描述统计，不是样本外验证.\begin{center}\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{tabular}{lrr}
+\toprule
+区间 & Q5 年化 & 基准年化 \\
+\midrule
+2018--2021 & 4.24\% & 6.40\% \\
+2022--2025 & 6.46\% & 2.90\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+\paragraph{缺价敏感性} 将 62 只实际记录提前结束的证券从各组和基准中剔除，保留原分数并重新分组后，Q5 相对基准的年化差由 0.70 降至 0.26 个百分点. 这是含事后信息的敏感性分析，不能作为事前可实施的筛选规则，也不能由缺价直接断定退市原因.
+\paragraph{月度超额} 定义为 Q5 月复合收益减去基准月复合收益. 96 个月的均值为 -0.0065\%，标准误为 0.2724\%，$t=-0.024$. 标准误为月超额样本标准差除以月份数平方根，t 值为均值除以标准误；采用月份独立同分布假设，未校正自相关. 这项结果不支持稳定正月超额的结论.
+\paragraph{因子重叠与分层} 低波动和低换手的平均月度截面秩相关为 0.671，两者信息存在重叠. 原组合 Q4 年化 7.01\% 高于 Q5 的 5.34\%，五组收益不严格单调.
+\paragraph{多空假设} 多头与空头目标各为权益的 100\%，总敞口 200\%. 假设无限借券、不含融券费用，结果仅为研究型因子价差，不能视为实际可借券策略.\par\begingroup\small\emergencystretch=2em 
+\paragraph{数据依据} 本页来自 \nolinkurl{results/robustness/} 中的 \nolinkurl{cost_sensitivity.csv}、\nolinkurl{period_performance.csv}、\nolinkurl{missing_price_excess_comparison.csv}、\nolinkurl{missing_price_inventory.csv}、\nolinkurl{monthly_excess_summary.csv} 和 \nolinkurl{factor_rank_correlation.csv}.\par\endgroup
 \end{document}
