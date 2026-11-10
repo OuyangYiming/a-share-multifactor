@@ -126,25 +126,12 @@ def read_inputs(root):
     return data
 
 
-def nav_plot(nav):
-    ticks = [int(np.flatnonzero(nav.index.year == year)[0]) for year in sorted(set(nav.index.year))]
-    labels = [str(nav.index[index].year) for index in ticks]
-    styles = ['thin,densely dotted', 'thin,dashed', 'thin,dashdotted',
-              'semithick,dash pattern=on 5pt off 2pt on 1pt off 2pt',
-              'thick,solid', 'semithick,dash pattern=on 8pt off 3pt']
-    lines = [r'\begin{center}\begin{tikzpicture}', r'\begin{axis}[',
-             r'width=\textwidth,height=7.3cm,scale only axis=false,',
-             r'tick label style={font=\small},label style={font=\small},',
-             r'axis line style={black},ymajorgrids=true,grid style={black!15},',
-             r'ylabel={净值},xlabel={交易日期},xmin=0,xmax=' + str(len(nav) - 1) + ',',
-             'xtick={' + ','.join(map(str, ticks)) + '},xticklabels={' + ','.join(labels) + '},',
-             r'legend style={font=\small,draw=none,at={(0.5,1.04)},anchor=south},legend columns=3]']
-    for code, style in zip(PORTFOLIOS, styles):
-        coords = ' '.join(f'({i},{value:.8g})' for i, value in enumerate(nav[code]))
-        lines += [r'\addplot[black,no marks,' + style + '] coordinates {' + coords + '};',
-                  r'\addlegendentry{' + NAMES.get(code, code) + '}']
-    return '\n'.join(lines + [r'\end{axis}\end{tikzpicture}',
-                              r'\par\small 图 1. 月度分层组合与等权基准的扣费净值.', r'\end{center}'])
+def nav_figure():
+    return r'''\begin{center}
+\includegraphics[width=\textwidth]{mvp_nav.png}
+\par\small 图 1. 月度分层组合与等权基准的扣费净值.
+Q5 为红色加粗实线，等权基准为黑色虚线.
+\end{center}'''
 
 
 def quintile_interpretation(performance):
@@ -307,7 +294,7 @@ def robustness_section(data):
             + '，五组收益不严格单调.'
             + r'\paragraph{多空假设.} 多头与空头目标各为权益的 100\%，总敞口 200\%. '
               '假设无限借券、不含融券费用，结果仅为研究型因子价差，不能视为实际可借券策略.'
-            + r'\par\begingroup\small\emergencystretch=2em '
+            + r'\par\begingroup\small\emergencystretch=2em'
               r'\paragraph{数据依据.} 本页来自 \nolinkurl{results/robustness/} 中的 '
               r'\nolinkurl{cost_sensitivity.csv}、\nolinkurl{period_performance.csv}、'
               r'\nolinkurl{missing_price_excess_comparison.csv}、'
@@ -364,7 +351,7 @@ def render_tex(data):
         '@@IC@@': tabular(['因子', '均值', '标准差', 'ICIR', '正值比例', '有效月数'], ic_rows),
         '@@EXECUTION@@': tabular(execution_headers, execution_rows), '@@TURNOVER@@': turnover_text,
         '@@ANNUAL@@': tabular(['年份', 'Q1', 'Q5', '等权基准', '收益差/百分点'], annual_rows),
-        '@@FIGURE@@': nav_plot(nav), '@@OPTIONAL@@': optional_comparisons(data),
+        '@@FIGURE@@': nav_figure(), '@@OPTIONAL@@': optional_comparisons(data),
         '@@COVERAGE@@': observed_coverage(data),
         '@@EARLY_ENDING@@': str(data['early_ending_count']),
         '@@ROBUSTNESS@@': robustness_section(data).replace(r'\paragraph', '\n' + r'\paragraph'),
@@ -374,12 +361,12 @@ def render_tex(data):
 % Generated from completed MVP CSV files by build_report.py.
 \IfFileExists{aomart.cls}{\documentclass[a4paper]{aomart}}{\documentclass[11pt,a4paper]{amsart}}
 \usepackage[a4paper,margin=25mm,headheight=15pt,headsep=7mm]{geometry}
-\usepackage{fontspec,xeCJK,amsmath,amssymb,booktabs,array,pgfplots,needspace}
+\usepackage{fontspec,xeCJK,amsmath,amssymb,booktabs,array,graphicx,needspace}
+\graphicspath{{results/figures/}{../results/figures/}}
 \IfFontExistsTF{Noto Serif CJK SC}{\setCJKmainfont{Noto Serif CJK SC}}
  {\IfFontExistsTF{SimSun}{\setCJKmainfont{SimSun}[AutoFakeBold=2]}{\setCJKmainfont{FandolSong-Regular}[AutoFakeBold=2]}}
 \usepackage{hyperref}
 \hypersetup{hidelinks,pdftitle={A股四因子月度研究},pdfauthor={}}
-\pgfplotsset{compat=1.18}
 \makeatletter
 \@ifclassloaded{aomart}{\copyrightnote{}\doinumber{}\let\ps@firstpage\ps@plain}{}
 \renewcommand{\abstractname}{摘要}
@@ -445,7 +432,7 @@ def render_tex(data):
 \paragraph{累计与年化表现.} 结果表逐项读取本次运行的绩效文件. @@QUINTILE_INTERPRETATION@@ Q5 的最大回撤为 @@Q5_DD@@.
 @@PERFORMANCE@@
 @@FIGURE@@
-图 1 按同一日度净值 CSV 绘制黑白矢量曲线；横轴依实际交易日顺序展开. 对应的项目原始图为 \href{../results/figures/mvp_nav.png}{\texttt{mvp\_nav.png}}. 六条曲线均已扣除上述成交费用. 图中等权基准同样受调仓成交条件约束，不以理想化指数代替实际执行.
+图 1 直接采用项目现有的 \href{../results/figures/mvp_nav.png}{\texttt{mvp\_nav.png}}. 六条曲线均已扣除上述成交费用. 图中等权基准同样受调仓成交条件约束，不以理想化指数代替实际执行.
 
 \paragraph{逐年表现.} 年收益使用当年最后一日净值除以上一年的最后一日净值，再减一；第一年以前述初始现金净值为起点. 最后一列为两组合当年收益率的算术差，单位为百分点，不代表另行模拟的可交易多空账户.
 @@ANNUAL@@
@@ -490,6 +477,8 @@ def compile_tex(source_path, output_path, engine='xelatex'):
         raise ValueError('未找到 XeLaTeX. 请安装 TeX Live 或使用 --tex-only 导出源码.')
     with tempfile.TemporaryDirectory(prefix='a-share-report-') as temporary:
         build = Path(temporary)
+        shutil.copyfile(source_path.parent.parent / 'results' / 'figures' / 'mvp_nav.png',
+                        build / 'mvp_nav.png')
         for _ in range(2):
             process = subprocess.run([binary, '-interaction=nonstopmode', '-halt-on-error',
                                       '-no-shell-escape', '-output-directory', str(build),

@@ -121,4 +121,4 @@ GitHub 随附汇总结果和净值图，不随附约 30 MB 的逐笔成交大表
 
 离线分析入口为 `python results/robustness/run_closing_checks.py missing` 和 `python results/robustness/run_closing_checks.py robustness`. 需要完整的原缓存、信号和逐笔成交表；脚本拒绝覆盖已有输出，重跑时使用独立副本并将该步已有结果另存. 缺价清单中的交易状态和后续成员资格仅描述缓存事实，无法识别并购、退市或供应商漏数的经济原因；未联网推断原因. 本次实际耗时分别为 16.80 秒和 34.14 秒，不代表其它机器或首次下载耗时.
 
-报告源码 `report/report.tex` 和生成器 `report/build_report.py` 都已提交. 有完整本地结果时，一条命令 `python report/build_report.py` 可重新生成 PDF，Python 依赖见 `requirements.txt`；另需 XeLaTeX、TeX Live 的 aomart（或 amsart）、xeCJK、pgfplots、booktabs、needspace 等宏包，以及 Noto Serif CJK SC、SimSun 或 FandolSong-Regular 字体. 公开副本的自包含 TeX 也可用 `latexmk -xelatex -outdir=report report/report.tex` 编译，无需下载原始行情或逐笔成交表，额外需要 latexmk 及其 Perl 运行环境.
+报告源码 `report/report.tex` 和生成器 `report/build_report.py` 都已提交. 有完整本地结果时，一条命令 `python report/build_report.py` 可重新生成 PDF，Python 依赖见 `requirements.txt`；另需 XeLaTeX、TeX Live 的 aomart（或 amsart）、xeCJK、graphicx、booktabs、needspace 等宏包，以及 Noto Serif CJK SC、SimSun 或 FandolSong-Regular 字体. 公开副本的 TeX 配合仓库随附的 `results/figures/mvp_nav.png` 也可用 `latexmk -xelatex -outdir=report report/report.tex` 编译，无需下载原始行情或逐笔成交表，额外需要 latexmk 及其 Perl 运行环境.
