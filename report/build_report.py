@@ -181,6 +181,10 @@ def optional_comparisons(data):
                         '相对财富收益为终值之比减一. 跟踪误差为日收益率差的样本标准差乘以 '
                         r'$\sqrt{252}$；信息比率为日收益率差的均值乘以 252 后除以跟踪误差.'
                         + tabular(['组合', '年化差/百分点', '相对财富收益', '跟踪误差', '信息比率'], rows)
+                        + 'Q5 的年化波动（' + percent(data['performance'].at['Q5', 'annual_vol'])
+                        + '）低于基准（' + percent(data['performance'].at['benchmark', 'annual_vol'])
+                        + '），复利损耗更小；粗略按算术收益估算，两者平均收益几乎相同，所以信息比率接近 0，年化差 '
+                        + number(q5.cagr_difference * 100, 2) + ' 个百分点并不代表更高的平均收益.' + r'\par'
                         + r'''\begingroup\small
 \noindent 表注：组合列标识分层账户，$p$ 为该组合，$b$ 为同池等权基准.
 令 $V_{p,0}=V_{b,0}=1$，$N$ 为实际观察交易日数，
