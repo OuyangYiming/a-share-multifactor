@@ -469,7 +469,7 @@ RankIC 与组合净值回答不同问题：前者描述下一持有期收益的�
 
 数据缓存齐备后，在项目根目录运行 \texttt{python run\_all.py --offline} 生成正式结果，再运行 \texttt{python report/build\_report.py} 生成本报告及可编辑源文件. 报告程序读取净值、绩效、样本、IC 与成交 CSV，核对所需文件和关键维度后才写入输出；本次文中所有实证数值均由这些输入格式化或按明确公式计算.
 
-代码入口依次调用 \texttt{src/data.py}、\texttt{src/factors.py}、\texttt{src/backtest.py} 与 \texttt{src/evaluate.py}. 对应的关键检查位于 \texttt{tests/test\_mvp.py}；运行方式为 \texttt{python -m pytest -q}. 报告不把测试框架存在视为测试已通过，具体通过情况以实际终端输出为准. 原始结果文件集中在 \texttt{results/tables/}，图形集中在 \texttt{results/figures/}. 方法的适用边界统一参见 \href{../README.md\#局限}{README 的“局限”一节}.
+代码入口依次调用 \texttt{src/data.py}、\texttt{src/factors.py}、\texttt{src/backtest.py} 与 \texttt{src/evaluate.py}. 关键检查共 7 项：5 项 MVP 检查位于 \texttt{tests/test\_mvp.py}，2 项未来函数反面检验位于 \nolinkurl{tests/test_lookahead_canary.py}，反面检验仅用合成数据；运行方式为 \texttt{python -m pytest -q}. 报告不把测试框架存在视为测试已通过，具体通过情况以实际终端输出为准. 原始结果文件集中在 \texttt{results/tables/}，图形集中在 \texttt{results/figures/}. 方法的适用边界统一参见 \href{../README.md\#局限}{README 的“局限”一节}.
 @@ROBUSTNESS@@
 \end{document}
 '''
