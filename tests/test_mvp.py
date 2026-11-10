@@ -196,7 +196,7 @@ def test_rank_ic_matches_ten_stock_hand_calculation():
     result = calculate_rank_ic(signals.sample(frac=1, random_state=7), forward.sample(frac=1, random_state=3))
     assert set(result["factor"]) == set(FACTORS + ["score"])
     assert result["n"].eq(10).all()
-    # Two adjacent swaps give sum(d_i**2)=4, hence rho=97/99.
+    # Two adjacent swaps give sum(d_i**2)=4, hence rho=161/165.
     expected = 1 - 6 * 4 / (10 * 99)
     assert len(result) == len(FACTORS) + 1
     assert pd.to_datetime(result["date"]).eq(pd.Timestamp("2020-01-31")).all()

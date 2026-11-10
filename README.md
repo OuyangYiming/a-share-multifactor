@@ -26,14 +26,14 @@
 在现有 Windows 环境运行：
 
 ```powershell
-Set-Location 'D:\Codex\2026-11-09\fen\outputs\a-share-multifactor'
-& 'D:\Codex\2026-11-09\fen\work\.venv\Scripts\python.exe' run_all.py
+Set-Location <project-directory>
+python run_all.py
 ```
 
 首次运行需要联网下载 BaoStock 数据；已保存的 CSV 缓存会复用，下载中断后可重新执行同一命令. 单只股票多次失败后先处理其余股票，最后补拉；仍缺数据时停止，不生成缺样本的正式回测. 缓存完整后可离线重算：
 
 ```powershell
-& 'D:\Codex\2026-11-09\fen\work\.venv\Scripts\python.exe' run_all.py --offline
+python run_all.py --offline
 ```
 
 离线模式缺少所需缓存时会报错. 迁移环境时使用 Python 3.12，按 `requirements.txt` 安装依赖后，在项目根目录运行 `python run_all.py`.

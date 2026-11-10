@@ -11,3 +11,8 @@ __pycache__/
 report/*.aux
 report/*.log
 report/*.out
+
+# Local handoff and unfinished prior analysis snapshots
+docs/HANDOFF.md
+results/robustness/README_before.md
+results/robustness/original_files_sha256.csv
