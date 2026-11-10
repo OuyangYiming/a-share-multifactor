@@ -298,6 +298,8 @@ def robustness_section(data):
             + '，五组收益不严格单调.'
             + r'\paragraph{多空假设.} 多头与空头目标各为权益的 100\%，总敞口 200\%. '
               '假设无限借券、不含融券费用，结果仅为研究型因子价差，不能视为实际可借券策略.'
+            + r'\paragraph{未做的事.} 去极值、标准化、行业与市值中性化、样本外验证、'
+              '组合优化、基本面因子、退市结算建模.'
             + r'\par\begingroup\small\emergencystretch=2em'
               r'\paragraph{数据依据.} 本页来自 \nolinkurl{results/robustness/} 中的 '
               r'\nolinkurl{cost_sensitivity.csv}、\nolinkurl{period_performance.csv}、'
