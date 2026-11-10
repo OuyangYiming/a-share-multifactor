@@ -345,6 +345,9 @@ def render_tex(data):
         '@@EXCLUDED_MEAN@@': number(sample['excluded'].mean(), 1), '@@COST@@': number(data['cost_bps'], 2),
         '@@Q5_RETURN@@': percent(q5['total_return']), '@@BENCH_RETURN@@': percent(benchmark['total_return']),
         '@@Q5_CAGR@@': percent(q5['cagr']), '@@Q5_DD@@': percent(q5['max_drawdown']),
+        '@@Q5_CAGR_DIFF@@': number((q5['cagr'] - benchmark['cagr']) * 100, 2),
+        '@@MONTHLY_T_APPROX@@': number(data['robustness']['monthly_excess_summary'].iloc[0]['t_value'], 2),
+        '@@LOW_FACTOR_CORR@@': number(data['robustness']['factor_rank_correlation'].set_index('factor').at['low_volatility', 'turnover'], 2),
         '@@SCORE_IC@@': number(ic.at['score', 'mean_rank_ic'], 4), '@@SCORE_MONTHS@@': str(int(ic.at['score', 'months'])),
         '@@PAIR_MEAN@@': number(avg_n, 1), '@@FILLED@@': f'{len(filled):,}', '@@BLOCKED@@': f'{len(blocked):,}',
         '@@PERFORMANCE@@': tabular(['组合', '总收益', '年化收益', '年化波动', 'Sharpe', '最大回撤'], performance_rows),
@@ -382,6 +385,7 @@ def render_tex(data):
 \begin{document}
 \begin{abstract}
 本文以 BaoStock 历史沪深 300 与中证 500 成员并集构造月度股票池，使用动量、反转、低波动和换手率四个信号，按等权截面排名形成综合分数. 回测覆盖 @@START@@ 至 @@END@@，共 @@DAYS@@ 个交易日、@@MONTHS@@ 次月度调仓. 本次正式结果中，Q5 总收益为 @@Q5_RETURN@@，相同交易约束与成本下的等权基准为 @@BENCH_RETURN@@；综合分数平均 RankIC 为 @@SCORE_IC@@. 本报告给出数据范围、信号时点、成交规则和结果口径，数值由项目结果文件生成.
+Q5 年化收益比同池等权基准高约 @@Q5_CAGR_DIFF@@ 个百分点，但 Q5 相对基准的月度超额均值接近零（t{\fontspec{Latin Modern Math}≈}@@MONTHLY_T_APPROX@@），不足以支持稳定超额；信号主要来自低波动与低换手，二者高度相关（平均秩相关 @@LOW_FACTOR_CORR@@）；单边成本升至 30 bps 后优势消失. 本研究为价量四因子的最小版本，未做去极值、行业与市值中性化和样本外验证，股票池为沪深300+中证500（中证800口径），不是全 A 股.
 \end{abstract}
 \maketitle
 
