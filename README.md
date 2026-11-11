@@ -9,7 +9,7 @@
 **从哪里看起：**
 
 1. 先看下面的净值图.
-2. 再读 [report/report.pdf](report/report.pdf)（原 6 页，已补充假设说明）.
+2. 再读 [report/report.pdf](report/report.pdf)（7 页）.
 3. 想看代码：[notebooks/mvp_walkthrough.ipynb](notebooks/mvp_walkthrough.ipynb)（十只股票的手算小例子）.
 4. 想自己运行：需联网下载数据，耗时较长，取决于网络，需耐心等待，见下方“运行”一节.
 
