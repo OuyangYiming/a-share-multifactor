@@ -120,7 +120,7 @@ def read_inputs(root):
     robustness = root / 'results' / 'robustness'
     stems = ('cost_sensitivity', 'period_performance', 'missing_price_inventory',
              'missing_price_excess_comparison', 'monthly_excess_summary',
-             'factor_rank_correlation')
+             'factor_rank_correlation', 'single_factor_performance')
     data['robustness'] = {stem: pd.read_csv(robustness / f'{stem}.csv') for stem in stems}
     data['early_ending_count'] = int(data['robustness']['missing_price_inventory']['ended_early'].sum())
     return data
@@ -254,6 +254,49 @@ def observed_coverage(data):
     return (r'\paragraph{数据覆盖统计.} ' + ' '.join(parts)) if parts else ''
 
 
+def key_assumptions(data):
+    """Explain fixed choices and quote existing results without new research."""
+    correlation = data['robustness']['factor_rank_correlation'].set_index('factor').at[
+        'low_volatility', 'turnover']
+    points = [
+        ('组内等权', '以每只股票相同的目标权重作为易解释的基线，避免大市值股票直接主导组合；'
+         '但可能提高相对小市值、低流动性股票的影响. 未检验市值加权、逆波动加权等组内加权方式.'),
+        ('四因子等权平均', '采用固定等权方案以减少需要估计的参数，便于复现，但没有按信息重叠程度调整权重. '
+         '低波动与低换手平均秩相关为 ' + number(correlation, 3)
+         + '，相近信息被重复计权，使“冷清稳定”类信息的有效权重偏高；未检验相关性调整权重或仅用过去数据估计的动态权重方案.'),
+        ('先排名再平均', '截面排名统一不同因子的量纲并减弱极端值影响，但丢失原始数值的差距大小. '
+         '本研究未做标准化，也未检验直接将标准化因子值加权合成等替代方案.'),
+        ('5 组', '五分组在排序区分度与组内样本数量之间采用简明折中，但分组边界会把分数接近的股票分开. '
+         '未检验其他分组数或按连续分数配置权重的方式.'),
+        ('月度调仓', '调仓频率与下月收益标签一致，并相对更高频调仓控制交易次数；但无法及时响应月内信号变化，受阻头寸也可能保留较久. '
+         '未检验周度、季度或按信号变化触发的调仓方案.'),
+        ('因子窗口 21/252/60/20', '21 日用于短期反转及动量跳过期，252 日用于动量回看，60 日用于波动率，20 日用于平均换手率，'
+         '分别对应便于解释的月、年、季、月尺度. 固定窗口可能遗漏其他期限的信息或受行情阶段影响，未检验其他窗口长度.'),
+        ('15 bps 与开盘成交', '固定单边 15 bps，并在信号后下一交易日开盘成交，便于明确成本和信号先后关系；'
+         '开盘涨跌停门控仍是简化，未刻画排队、冲击和实际成交概率. 已有固定费率敏感性比较，但未检验逐笔费用与滑点模型、分时成交或分批执行等替代方案.'),
+    ]
+    single = data['robustness']['single_factor_performance']
+    q5 = single.loc[single.portfolio.eq('Q5')].set_index('factor')
+    if q5.index.has_duplicates or not set(FACTORS[:-1]).issubset(q5.index):
+        raise ValueError('单因子绩效表缺少唯一的四因子 Q5 结果.')
+    comparison = ('在相同合格样本和单边 15 bps 口径下，动量、反转、低波动、低换手的单因子 Q5 Sharpe 分别为 '
+                  + '、'.join(number(q5.at[factor, 'sharpe'], 6) for factor in FACTORS[:-1])
+                  + '，综合分数 Q5 为 ' + number(data['performance'].at['Q5', 'sharpe'], 6)
+                  + '. 这只是观察，未检验因果；不能据此认定增删因子或调整权重会改善表现.')
+    return points, comparison
+
+
+def assumptions_section(data):
+    points, comparison = key_assumptions(data)
+    return ('\n' + r'\subsection*{关键假设与已知弱点}' + '\n'
+            + '\n'.join(r'\paragraph{' + escape(label) + '.} ' + escape(text)
+                        for label, text in points)
+            + '\n' + r'\paragraph{单因子与综合分数的观察.} ' + escape(comparison)
+            + '\n' + '权重方案、分组数、窗口长度和加权方式均未作系统比较或优化. '
+            + r'Sharpe 直接读取 \nolinkurl{results/robustness/single_factor_performance.csv} '
+              r'与 \nolinkurl{results/tables/mvp_performance.csv}，此处仅作显示舍入.' + '\n')
+
+
 def robustness_section(data):
     """Format the committed sensitivity tables without rerunning research."""
     saved = data['robustness']
@@ -296,6 +339,7 @@ def robustness_section(data):
             + number(correlation, 3) + '，两者信息存在重叠. 原组合 Q4 年化 '
             + percent(original.q4_cagr) + ' 高于 Q5 的 ' + percent(original.q5_cagr)
             + '，五组收益不严格单调.'
+            + assumptions_section(data)
             + r'\paragraph{多空假设.} 多头与空头目标各为权益的 100\%，总敞口 200\%. '
               '假设无限借券、不含融券费用，结果仅为研究型因子价差，不能视为实际可借券策略.'
             + r'\paragraph{未做的事.} 去极值、标准化、行业与市值中性化、样本外验证、'
