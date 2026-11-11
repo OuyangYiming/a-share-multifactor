@@ -54,6 +54,22 @@ Q5 年化比同池等权基准高约 0.70 个百分点，但月度超额不显�
 
 ## 运行
 
+新克隆先使用 Python 3.12 安装依赖：`python -m pip install -r requirements.txt`. 无需 `data/` 即可运行 `python -m pytest -q` 和导入四个核心模块；公开仓库已随附结果表和净值图，可直接阅读. 冻结版本的重算请在独立副本中进行，下面的 `run_all.py` 命令会写入并覆盖同名结果文件.
+
+Notebook 还需要内核依赖：`python -m pip install ipykernel`，然后在 VS Code 选择该环境. 仅安装 `requirements.txt` 时，第一个代码单元会因缺少 `IPython` 失败；补齐内核后，教学计算和末尾读取随附结果均不需要 `data/`，也不联网下载行情.
+
+| 命令或入口 | 新克隆中的输入条件 |
+|---|---|
+| `python -m pytest -q`、导入 `src` 四个核心模块 | 仅需安装项目依赖 |
+| 教学 Notebook | 另需 Notebook 内核；读取已提交结果，无需行情缓存 |
+| `python run_all.py` | 首次需联网下载；会重算并覆盖同名结果，本轮冻结检查未执行 |
+| `python run_all.py --offline` | 需完整行情、复权、成员与交易日历缓存；无缓存时不能运行 |
+| `python scripts/build_manifest.py` | 需 `data/mvp/constituents.csv` 和全部对应日线缓存 |
+| `python report/build_report.py`（含 `--tex-only`） | 需完整结果输入，包括未提交的 `mvp_trades.csv`；新克隆不能直接通过 |
+| `python scripts/finalize_delivery.py --check-only` | 新克隆缺逐笔成交表、信号、收益标签、成员表及数据清单，检查会明确报缺失；正式打包也需要这些输入 |
+| `python results/robustness/run_closing_checks.py missing` / `robustness` | 需原缓存及派生信号等输入；已有输出时拒绝覆盖，不用于直接修改冻结版本 |
+| 从已提交的 TeX 编译报告 | 无需 `data/` 或逐笔成交表；需要下文所列 LaTeX 工具、宏包和字体 |
+
 在现有 Windows 环境运行：
 
 ```powershell
