@@ -1,4 +1,4 @@
-name: Five MVP checks
+name: CSI800 v1 - seven checks
 on: [push, pull_request]
 permissions:
   contents: read

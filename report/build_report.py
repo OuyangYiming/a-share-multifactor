@@ -418,8 +418,8 @@ def render_tex(data):
 \graphicspath{{results/figures/}{../results/figures/}}
 \IfFontExistsTF{Noto Serif CJK SC}{\setCJKmainfont{Noto Serif CJK SC}}
  {\IfFontExistsTF{SimSun}{\setCJKmainfont{SimSun}[AutoFakeBold=2]}{\setCJKmainfont{FandolSong-Regular}[AutoFakeBold=2]}}
-\usepackage{hyperref}
-\hypersetup{hidelinks,pdftitle={A股四因子月度研究},pdfauthor={}}
+\usepackage{hyperref,fancyhdr}
+\hypersetup{hidelinks,pdftitle={沪深300与中证500成分股的四因子月度研究},pdfauthor={}}
 \makeatletter
 \@ifclassloaded{aomart}{\copyrightnote{}\doinumber{}\let\ps@firstpage\ps@plain}{}
 \renewcommand{\abstractname}{摘要}
@@ -429,8 +429,12 @@ def render_tex(data):
 \setlength{\parindent}{2em}
 \setlength{\parskip}{0pt}
 \AtBeginDocument{\fontsize{11}{14}\selectfont}
-\pagestyle{plain}
-\title{A 股四因子月度研究\\历史指数成员、RankIC 与含成本分层回测}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[C]{\small 沪深300与中证500成分股的四因子月度研究}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\title{沪深300与中证500成分股的四因子月度研究}
 \date{}
 \begin{document}
 \begin{abstract}
