@@ -264,6 +264,6 @@ Q5 为 5.31\%，既非年化值，也非两总收益率的算术差.
 权重方案、分组数、窗口长度和加权方式均未作系统比较或优化. Sharpe 直接读取 \nolinkurl{results/robustness/single_factor_performance.csv} 与 \nolinkurl{results/tables/mvp_performance.csv}，此处仅作显示舍入.
 
 \paragraph{多空假设} 多头与空头目标各为权益的 100\%，总敞口 200\%. 假设无限借券、不含融券费用，结果仅为研究型因子价差，不能视为实际可借券策略.
-\paragraph{未做的事} 去极值、标准化、行业与市值中性化、样本外验证、组合优化、基本面因子、退市结算建模.\par\begingroup\small\emergencystretch=2em
+\paragraph{未做的事} 去极值、标准化、行业与市值中性化、样本外验证、组合优化、基本面因子、退市结算建模. 尚未提供 IC 的 p 值与时间序列图，也未进行自相关稳健的 IC t/p 检验；已有假设月份独立同分布的普通 t 值见 \nolinkurl{results/robustness/ic_mean_statistics.csv}.\par\begingroup\small\emergencystretch=2em
 \paragraph{数据依据} 本页来自 \nolinkurl{results/robustness/} 中的 \nolinkurl{cost_sensitivity.csv}、\nolinkurl{period_performance.csv}、\nolinkurl{missing_price_excess_comparison.csv}、\nolinkurl{missing_price_inventory.csv}、\nolinkurl{monthly_excess_summary.csv} 和 \nolinkurl{factor_rank_correlation.csv}.\par\endgroup
 \end{document}
