@@ -1,9 +1,0 @@
-{
-  "tests": "37",
-  "failures": "0",
-  "errors": "0",
-  "skipped": "0",
-  "time": "0.843",
-  "command": "python -m pytest -q",
-  "scope": "Stage 0 AKShare unit tests; constructed fixtures only; not a no-lookahead audit"
-}

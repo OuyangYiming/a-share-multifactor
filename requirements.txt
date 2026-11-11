@@ -1,5 +1,4 @@
-# Locked dependencies for run_all.py and the five MVP checks (Python 3.12).
-# Historical tools: pip install -r requirements-legacy.txt
+# Locked dependencies for run_all.py and seven checks (Python 3.12).
 baostock==0.9.4
 colorama==0.4.6
 contourpy==1.4.0

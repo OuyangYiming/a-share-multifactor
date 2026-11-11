@@ -56,9 +56,10 @@ MEMBERS = 'data/mvp/constituents.csv'
 MANIFEST = 'data/mvp/manifest.csv'
 FIGURE = 'results/figures/mvp_nav.png'
 SOURCE_FILES = [
-    'README.md', '.gitignore', 'requirements.txt', 'requirements-legacy.txt', 'pytest.ini',
+    'README.md', '.gitignore', 'requirements.txt', 'pytest.ini',
     '.github/workflows/tests.yml', 'run_all.py', 'src/__init__.py', 'src/data.py',
     'src/factors.py', 'src/evaluate.py', 'src/backtest.py', 'tests/test_mvp.py',
+    'tests/test_lookahead_canary.py',
     'notebooks/mvp_walkthrough.ipynb', 'report/build_report.py',
     'scripts/finalize_delivery.py', 'scripts/build_manifest.py',
 ]
